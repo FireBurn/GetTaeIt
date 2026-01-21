@@ -17,7 +17,7 @@ class Converters {
         val listType = object : TypeToken<List<UUID>>() {}.type
         return value?.let { Gson().fromJson(it, listType) }
     }
-    
+
     @TypeConverter
     fun fromLatLng(latLng: LatLng?): String? {
         return latLng?.let { "${it.latitude},${it.longitude}" }
@@ -29,7 +29,7 @@ class Converters {
             LatLng(it[0].toDouble(), it[1].toDouble())
         }
     }
-    
+
     @TypeConverter
     fun fromIntList(value: List<Int>?): String? {
         return value?.let { Gson().toJson(it) }

@@ -26,14 +26,23 @@ class LocationManager @Inject constructor(
     private val geofencePendingIntent: PendingIntent by lazy {
         val intent = Intent(context, GeofenceBroadcastReceiver::class.java)
         // Use FLAG_IMMUTABLE for security best practices
-        PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        PendingIntent.getBroadcast(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     @SuppressLint("MissingPermission") // Permissions will be handled at the UI layer before calling this
     fun addWorkGeofence(workLocation: LatLng) {
         val geofence = Geofence.Builder()
             .setRequestId("WORK_GEOFENCE")
-            .setCircularRegion(workLocation.latitude, workLocation.longitude, 100f) // 100-meter radius
+            .setCircularRegion(
+                workLocation.latitude,
+                workLocation.longitude,
+                100f
+            ) // 100-meter radius
             .setExpirationDuration(Geofence.NEVER_EXPIRE)
             .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT)
             .build()

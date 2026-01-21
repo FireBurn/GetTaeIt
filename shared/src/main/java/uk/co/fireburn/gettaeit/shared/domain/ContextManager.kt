@@ -35,7 +35,8 @@ class ContextManager @Inject constructor(
         val currentHour = now.get(Calendar.HOUR_OF_DAY)
 
         val isWorkDay = prefs.workSchedule.workingDays.contains(dayOfWeek)
-        val isWorkHours = isWorkDay && currentHour in prefs.workSchedule.startHour until prefs.workSchedule.endHour
+        val isWorkHours =
+            isWorkDay && currentHour in prefs.workSchedule.startHour until prefs.workSchedule.endHour
 
         // If the user is inside the work geofence OR it's currently work hours,
         // they are in Work Mode.

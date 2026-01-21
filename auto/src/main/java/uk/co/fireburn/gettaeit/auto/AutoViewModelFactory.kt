@@ -2,7 +2,6 @@ package uk.co.fireburn.gettaeit.auto
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import dagger.assisted.AssistedFactory
 import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
 import javax.inject.Inject
 

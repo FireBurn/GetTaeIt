@@ -20,8 +20,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val userPreferences by viewModel.userPreferences.collectAsState()
-    var workSsid by remember(userPreferences.workSsid) { mutableStateOf(userPreferences.workSsid ?: "") }
-    var homeSsid by remember(userPreferences.homeSsid) { mutableStateOf(userPreferences.homeSsid ?: "") }
+    var workSsid by remember(userPreferences.workSsid) {
+        mutableStateOf(
+            userPreferences.workSsid ?: ""
+        )
+    }
+    var homeSsid by remember(userPreferences.homeSsid) {
+        mutableStateOf(
+            userPreferences.homeSsid ?: ""
+        )
+    }
 
     Column(modifier = Modifier.padding(16.dp)) {
         Text("Work Wi-Fi SSID")

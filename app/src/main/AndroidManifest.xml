@@ -11,9 +11,9 @@
 
     <application
         android:name=".GetTaeItApplication"
-        android:supportsRtl="true"
         android:allowBackup="true"
-        android:label="GetTaeIt">
+        android:label="GetTaeIt"
+        android:supportsRtl="true">
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -23,8 +23,9 @@
             </intent-filter>
         </activity>
 
-        <receiver android:name="uk.co.fireburn.gettaeit.shared.GeofenceBroadcastReceiver"
-            android:exported="true"/>
+        <receiver
+            android:name="uk.co.fireburn.gettaeit.shared.GeofenceBroadcastReceiver"
+            android:exported="true" />
 
     </application>
 

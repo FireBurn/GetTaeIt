@@ -2,7 +2,6 @@ package uk.co.fireburn.gettaeit.shared.domain.ai
 
 import com.google.ai.client.generativeai.GenerativeModel
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import uk.co.fireburn.gettaeit.shared.BuildConfig
 import javax.inject.Inject
