@@ -1,4 +1,3 @@
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -16,45 +15,61 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-        
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+
     }
 
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
     buildFeatures {
         compose = true
     }
-
     composeOptions {
         kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
     }
-
-
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = "17"
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
     }
 }
 
 dependencies {
     implementation(project(":shared"))
 
-    // Wear Compose
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.wear.compose.foundation)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.play.services.wearable)
+    implementation("androidx.percentlayout:percentlayout:1.0.0")
+    implementation("androidx.legacy:legacy-support-v4:1.0.0")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.wear:wear:1.3.0")
+
+    // Compose for Wear OS
     implementation(libs.androidx.wear.compose.material)
+    implementation(libs.androidx.wear.compose.foundation)
     implementation(libs.androidx.activity.compose)
-    
+    implementation(libs.androidx.compose.material.icons.extended)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
-    // Wearable Data Layer
-    implementation(libs.play.services.wearable)
-
-    // Core
-    implementation(libs.androidx.core.ktx)
+    // Lifecycle
+    implementation(libs.androidx.lifecycle.runtime.ktx)
 }
