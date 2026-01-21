@@ -5,12 +5,6 @@ import androidx.room.PrimaryKey
 import com.google.android.gms.maps.model.LatLng
 import java.util.UUID
 
-enum class TaskStatus {
-    TODO,
-    SORTED, // "Done" in Scottish
-    SCUNNERED // "Cancelled/Won't Do" in Scottish
-}
-
 enum class TaskContext {
     WORK,
     PERSONAL,
@@ -22,7 +16,7 @@ data class TaskEntity(
     @PrimaryKey val id: UUID = UUID.randomUUID(),
     val title: String,
     val description: String?,
-    val status: TaskStatus = TaskStatus.TODO,
+    val isCompleted: Boolean = false,
     val context: TaskContext = TaskContext.ANY,
     val priority: Int = 3, // 1 (Highest) to 5 (Lowest)
     val dependencyIds: List<UUID> = emptyList(),

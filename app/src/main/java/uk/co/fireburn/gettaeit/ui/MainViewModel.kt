@@ -48,4 +48,10 @@ class MainViewModel @Inject constructor(
             taskRepository.insertTask(newTask)
         }
     }
+
+    fun setTaskCompleted(task: TaskEntity, completed: Boolean) {
+        viewModelScope.launch {
+            taskRepository.updateTask(task.copy(isCompleted = completed))
+        }
+    }
 }
