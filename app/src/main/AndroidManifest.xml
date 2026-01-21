@@ -27,6 +27,10 @@
             android:name="uk.co.fireburn.gettaeit.shared.GeofenceBroadcastReceiver"
             android:exported="true" />
 
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${mapsApiKey}" />
+
     </application>
 
 </manifest>
