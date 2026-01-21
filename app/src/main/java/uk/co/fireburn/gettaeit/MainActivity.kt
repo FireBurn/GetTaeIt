@@ -8,7 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import dagger.hilt.android.AndroidEntryPoint
-import uk.co.fireburn.gettaeit.ui.TaskListScreen
+import uk.co.fireburn.gettaeit.ui.MainScreen
 import uk.co.fireburn.gettaeit.ui.theme.GetTaeItTheme
 
 @AndroidEntryPoint
@@ -17,12 +17,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             GetTaeItTheme {
-                // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    TaskListScreen()
+                    MainScreen()
                 }
             }
         }

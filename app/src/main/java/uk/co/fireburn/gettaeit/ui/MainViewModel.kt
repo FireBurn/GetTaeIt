@@ -6,9 +6,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import uk.co.fireburn.gettaeit.shared.AppContext
 import uk.co.fireburn.gettaeit.shared.ContextManager
 import uk.co.fireburn.gettaeit.shared.TaskRepository
+import uk.co.fireburn.gettaeit.shared.data.TaskContext
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 import javax.inject.Inject
 
@@ -28,7 +30,22 @@ class MainViewModel @Inject constructor(
     val appContext: StateFlow<AppContext> = contextManager.appContext
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.WhileSub-scribed(5000),
             initialValue = AppContext.PERSONAL
         )
+
+    fun addTask(title: String, description: String?) {
+        viewModelScope.launch {
+            val newTask = TaskEntity(
+                title = title,
+                description = description,
+                context = if (appContext.value == AppContext.WORK) TaskContext.WORK else TaskContext.PERSONAL,
+                locationTrigger = null,
+                wifiTrigger = null,
+                offsetReferenceId = null,
+                dueDate = null
+            )
+            taskRepository.insertTask(newTask)
+        }
+    }
 }

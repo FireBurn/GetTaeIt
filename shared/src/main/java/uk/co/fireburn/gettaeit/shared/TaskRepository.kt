@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import uk.co.fireburn.gettaeit.shared.data.TaskDao
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
+import uk.co.fireburn.gettaeit.shared.data.TaskContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,5 +25,9 @@ class TaskRepository @Inject constructor(
                 AppContext.COMMUTE -> tasks.filter { it.context == TaskContext.ANY } // Or some other logic for commute
             }
         }
+    }
+
+    suspend fun insertTask(task: TaskEntity) {
+        taskDao.insert(task)
     }
 }
