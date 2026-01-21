@@ -65,7 +65,7 @@ fun MainScreen() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.TaskList.route) {
-                TaskListScreen()
+                TaskListScreen(onAddTaskClicked = { navController.navigate("add_task") })
             }
             composable(Screen.KitchenDashboard.route) {
                 KitchenDashboardScreen()

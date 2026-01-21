@@ -5,8 +5,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -18,35 +22,50 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 
 @Composable
-fun TaskListScreen(viewModel: MainViewModel = hiltViewModel()) {
+fun TaskListScreen(
+    viewModel: MainViewModel = hiltViewModel(),
+    onAddTaskClicked: () -> Unit
+) {
     val tasks by viewModel.tasks.collectAsState()
 
-    LazyColumn {
-        items(tasks) { task ->
-            TaskItem(task = task, onTaskCompleted = { viewModel.setTaskCompleted(it, true) })
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(onClick = onAddTaskClicked) {
+                Icon(Icons.Filled.Add, contentDescription = "Add Task")
+            }
+        }
+    ) { paddingValues ->
+        LazyColumn(modifier = Modifier.padding(paddingValues)) {
+            items(tasks) { task ->
+                TaskItem(
+                    task = task,
+                    onCompletedChange = { isCompleted ->
+                        viewModel.setTaskCompleted(task, isCompleted)
+                    }
+                )
+            }
         }
     }
 }
 
 @Composable
-fun TaskItem(task: TaskEntity, onTaskCompleted: (TaskEntity) -> Unit) {
-    Card(
+fun TaskItem(
+    task: TaskEntity,
+    onCompletedChange: (Boolean) -> Unit
+) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(8.dp)
-        ) {
-            Checkbox(
-                checked = task.isCompleted,
-                onCheckedChange = { onTaskCompleted(task) }
-            )
-            Text(
-                text = task.title,
-                modifier = Modifier.weight(1f)
-            )
-        }
+        Text(
+            text = task.title,
+            modifier = Modifier.weight(1f)
+        )
+        Checkbox(
+            checked = task.isCompleted,
+            onCheckedChange = onCompletedChange
+        )
     }
 }
