@@ -34,14 +34,15 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)
 
     // Firebase
     implementation(platform(libs.firebase.bom))
-    implementation("com.google.firebase:firebase-firestore-ktx")
-    implementation("com.google.firebase:firebase-auth-ktx")
-    implementation("com.google.firebase:firebase-crashlytics-ktx")
+    implementation(libs.firebase.firestore.ktx)
+    implementation(libs.firebase.auth.ktx)
+    implementation(libs.firebase.crashlytics.ktx)
 
 
     // Gemini
@@ -52,4 +53,6 @@ dependencies {
     
     // Location and Geofencing
     implementation(libs.play.services.location)
+    implementation(libs.play.services.maps)
+    implementation(libs.gson)
 }

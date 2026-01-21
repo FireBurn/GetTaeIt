@@ -30,7 +30,7 @@ class MainViewModel @Inject constructor(
     val appContext: StateFlow<AppContext> = contextManager.appContext
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSub-scribed(5000),
+            started = SharingStarted.WhileSubscribed(5000),
             initialValue = AppContext.PERSONAL
         )
 

@@ -25,8 +25,10 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = libs.versions.compose.compiler.get()
+        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
     }
+
+
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -44,7 +46,6 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.wear.compose.foundation)
     implementation(libs.androidx.wear.compose.material)
-    implementation(libs.androidx.wear.compose.tooling)
     implementation(libs.androidx.activity.compose)
     
     // Hilt
