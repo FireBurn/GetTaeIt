@@ -3,31 +3,32 @@ package uk.co.fireburn.gettaeit.shared
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.google.android.gms.location.Geofence
+import android.util.Log
 import com.google.android.gms.location.GeofencingEvent
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 
-@AndroidEntryPoint
 class GeofenceBroadcastReceiver : BroadcastReceiver() {
 
-    @Inject
-    lateinit var locationManager: LocationManager
-
     override fun onReceive(context: Context, intent: Intent) {
-        val geofencingEvent = GeofencingEvent.fromIntent(intent) ?: return
-        if (geofencingEvent.hasError()) {
-            // Handle error
+        val geofencingEvent = GeofencingEvent.fromIntent(intent)
+        if (geofencingEvent == null) {
+            Log.e(TAG, "Geofencing event is null.")
             return
         }
 
-        when (geofencingEvent.geofenceTransition) {
-            Geofence.GEOFENCE_TRANSITION_ENTER -> {
-                locationManager.updateGeofenceState(true)
-            }
-            Geofence.GEOFENCE_TRANSITION_EXIT -> {
-                locationManager.updateGeofenceState(false)
-            }
+        if (geofencingEvent.hasError()) {
+            val errorMessage = "Geofence Error with code: ${geofencingEvent.errorCode}"
+            Log.e(TAG, errorMessage)
+            return
         }
+
+        val geofenceTransition = geofencingEvent.geofenceTransition
+        Log.i(TAG, "Geofence transition detected: $geofenceTransition")
+
+        // Here we would typically update a repository or send an event
+        // to notify the app that the user has entered/exited a geofence.
+    }
+
+    companion object {
+        private const val TAG = "GeofenceReceiver"
     }
 }
