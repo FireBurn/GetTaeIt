@@ -7,11 +7,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import uk.co.fireburn.gettaeit.shared.AppContext
-import uk.co.fireburn.gettaeit.shared.ContextManager
-import uk.co.fireburn.gettaeit.shared.TaskRepository
 import uk.co.fireburn.gettaeit.shared.data.TaskContext
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
+import uk.co.fireburn.gettaeit.shared.domain.AppMode
+import uk.co.fireburn.gettaeit.shared.domain.ContextManager
+import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
 import javax.inject.Inject
 
 @HiltViewModel
@@ -27,11 +27,11 @@ class MainViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
-    val appContext: StateFlow<AppContext> = contextManager.appContext
+    val appMode: StateFlow<AppMode> = contextManager.appMode
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = AppContext.PERSONAL
+            initialValue = AppMode.PERSONAL
         )
 
     fun addTask(title: String, description: String?) {
@@ -39,13 +39,13 @@ class MainViewModel @Inject constructor(
             val newTask = TaskEntity(
                 title = title,
                 description = description,
-                context = if (appContext.value == AppContext.WORK) TaskContext.WORK else TaskContext.PERSONAL,
+                context = if (appMode.value == AppMode.WORK) TaskContext.WORK else TaskContext.PERSONAL,
                 locationTrigger = null,
                 wifiTrigger = null,
                 offsetReferenceId = null,
                 dueDate = null
             )
-            taskRepository.insertTask(newTask)
+            taskRepository.addTask(newTask)
         }
     }
 

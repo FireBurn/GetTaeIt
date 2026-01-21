@@ -29,4 +29,15 @@ class Converters {
             LatLng(it[0].toDouble(), it[1].toDouble())
         }
     }
+    
+    @TypeConverter
+    fun fromIntList(value: List<Int>?): String? {
+        return value?.let { Gson().toJson(it) }
+    }
+
+    @TypeConverter
+    fun toIntList(value: String?): List<Int>? {
+        val listType = object : TypeToken<List<Int>>() {}.type
+        return value?.let { Gson().fromJson(it, listType) }
+    }
 }
