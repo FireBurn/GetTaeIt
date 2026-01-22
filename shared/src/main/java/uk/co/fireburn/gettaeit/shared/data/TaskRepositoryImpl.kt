@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.combine
 import uk.co.fireburn.gettaeit.shared.domain.AppMode
 import uk.co.fireburn.gettaeit.shared.domain.ContextManager
 import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,6 +23,10 @@ class TaskRepositoryImpl @Inject constructor(
                 else -> tasks
             }
         }
+    }
+
+    override suspend fun getTaskById(id: UUID): TaskEntity? {
+        return taskDao.getTaskByIdOnce(id)
     }
 
     override suspend fun addTask(task: TaskEntity) {

@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import uk.co.fireburn.gettaeit.shared.DataLayerSync
 import uk.co.fireburn.gettaeit.shared.data.TaskContext
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 import uk.co.fireburn.gettaeit.shared.domain.AppMode
@@ -22,7 +23,8 @@ import javax.inject.Inject
 class MainViewModel @Inject constructor(
     private val taskRepository: TaskRepository,
     private val contextManager: ContextManager,
-    private val geminiService: GeminiService
+    private val geminiService: GeminiService,
+    private val dataLayerSync: DataLayerSync
 ) : ViewModel() {
 
     private val _isBreakingDownTask = MutableStateFlow(false)
@@ -83,22 +85,7 @@ class MainViewModel @Inject constructor(
     fun setTaskCompleted(task: TaskEntity, completed: Boolean) {
         viewModelScope.launch {
             taskRepository.updateTask(task.copy(isCompleted = completed))
-        }
-    }
-
-    fun addTask(title: String, description: String) {
-        viewModelScope.launch {
-            val newTask = TaskEntity(
-                title = title,
-                description = description,
-                context = if (appMode.value == AppMode.WORK) TaskContext.WORK else TaskContext.PERSONAL,
-                dependencyIds = emptyList(),
-                locationTrigger = null,
-                wifiTrigger = null,
-                offsetReferenceId = null,
-                dueDate = null
-            )
-            taskRepository.addTask(newTask)
+            dataLayerSync.sendTaskUpdate(task.id, completed)
         }
     }
 }
