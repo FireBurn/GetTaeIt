@@ -18,5 +18,6 @@ data class UserPreferences(
     val workLocation: LatLng? = null,
     val workSsid: String? = null,
     val homeSsid: String? = null,
-    val isVacationMode: Boolean = false
+    val isVacationMode: Boolean = false,
+    val geminiModel: String? = null
 )

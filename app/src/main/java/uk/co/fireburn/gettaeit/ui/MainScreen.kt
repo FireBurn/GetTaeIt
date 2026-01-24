@@ -1,8 +1,11 @@
 package uk.co.fireburn.gettaeit.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -12,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -31,8 +35,13 @@ fun MainScreen() {
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = { navController.navigate("add_task") }) {
-                Icon(Icons.Default.Add, contentDescription = "Add a Wee Task")
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FloatingActionButton(onClick = { navController.navigate("voice_add_task") }) {
+                    Icon(Icons.Default.Mic, contentDescription = "Add Task by Voice")
+                }
+                FloatingActionButton(onClick = { navController.navigate("add_task") }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add a Wee Task")
+                }
             }
         },
         bottomBar = {
@@ -65,7 +74,8 @@ fun MainScreen() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.TaskList.route) {
-                TaskListScreen(onAddTaskClicked = { navController.navigate("add_task") })
+                // The FABs are now in the MainScreen's Scaffold, so this lambda is no longer needed here.
+                TaskListScreen(onAddTaskClicked = {})
             }
             composable(Screen.KitchenDashboard.route) {
                 KitchenDashboardScreen()
@@ -75,6 +85,9 @@ fun MainScreen() {
             }
             composable("add_task") {
                 AddTaskScreen(onTaskAdded = { navController.popBackStack() })
+            }
+            composable("voice_add_task") {
+                VoiceInputScreen(onNavigateBack = { navController.popBackStack() })
             }
         }
     }

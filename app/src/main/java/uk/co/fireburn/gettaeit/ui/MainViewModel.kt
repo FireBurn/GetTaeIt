@@ -30,6 +30,9 @@ class MainViewModel @Inject constructor(
     private val _isBreakingDownTask = MutableStateFlow(false)
     val isBreakingDownTask: StateFlow<Boolean> = _isBreakingDownTask.asStateFlow()
 
+    private val _isParsingVoice = MutableStateFlow(false)
+    val isParsingVoice: StateFlow<Boolean> = _isParsingVoice.asStateFlow()
+
     val tasks: StateFlow<List<TaskEntity>> = taskRepository.getTasksForCurrentMode()
         .stateIn(
             scope = viewModelScope,
@@ -55,7 +58,6 @@ class MainViewModel @Inject constructor(
                     title = prompt,
                     description = "Broken down by AI",
                     context = if (appMode.value == AppMode.WORK) TaskContext.WORK else TaskContext.PERSONAL,
-                    dependencyIds = emptyList(),
                     locationTrigger = null,
                     wifiTrigger = null,
                     offsetReferenceId = null,
@@ -80,6 +82,30 @@ class MainViewModel @Inject constructor(
                 }
             } finally {
                 _isBreakingDownTask.value = false
+            }
+        }
+    }
+
+    fun addTasksFromVoice(prompt: String) {
+        viewModelScope.launch {
+            _isParsingVoice.value = true
+            try {
+                val parsedTasks = geminiService.parseVoiceInput(prompt)
+                parsedTasks.forEach { parsedTask ->
+                    val newTask = TaskEntity(
+                        title = parsedTask.title,
+                        description = "Added by voice",
+                        context = parsedTask.context,
+                        locationTrigger = null,
+                        wifiTrigger = null,
+                        offsetReferenceId = null,
+                        offsetDuration = null,
+                        dueDate = null
+                    )
+                    taskRepository.addTask(newTask)
+                }
+            } finally {
+                _isParsingVoice.value = false
             }
         }
     }

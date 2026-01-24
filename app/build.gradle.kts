@@ -2,8 +2,11 @@ import java.io.FileInputStream
 import java.util.Properties
 
 plugins {
-    alias(libs.plugins.android.application)
+    // Apply Kotlin plugins FIRST to avoid AGP conflict
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.android.application)
+
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
@@ -19,12 +22,12 @@ if (localPropertiesFile.exists()) {
 
 android {
     namespace = "uk.co.fireburn.gettaeit"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "uk.co.fireburn.gettaeit"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -33,16 +36,12 @@ android {
             useSupportLibrary = true
         }
 
-        // Make the API key available to the AndroidManifest.xml
         manifestPlaceholders["mapsApiKey"] = localProperties.getProperty("MAPS_API_KEY", "")
     }
 
     buildFeatures {
         compose = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
+        buildConfig = true
     }
 
     packaging {
@@ -55,6 +54,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions {
         jvmTarget = "17"
     }
@@ -86,10 +86,10 @@ dependencies {
 
     // Maps
     implementation(libs.play.services.maps)
-    implementation("com.google.maps.android:maps-compose:2.11.4")
+    implementation(libs.maps.compose)
 
     // Permissions
-    implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+    implementation(libs.accompanist.permissions)
 
     // Firebase
     implementation(platform(libs.firebase.bom))

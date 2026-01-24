@@ -5,5 +5,6 @@ import uk.co.fireburn.gettaeit.shared.data.UserPreferences
 
 interface UserPreferencesRepository {
     fun getUserPreferences(): Flow<UserPreferences>
+    suspend fun setGeminiModel(model: String)
     suspend fun updateUserPreferences(userPreferences: UserPreferences)
 }
