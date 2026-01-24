@@ -37,10 +37,10 @@ fun MainScreen() {
         floatingActionButton = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 FloatingActionButton(onClick = { navController.navigate("voice_add_task") }) {
-                    Icon(Icons.Default.Mic, contentDescription = "Add Task by Voice")
+                    Icon(Icons.Default.Mic, contentDescription = "Blether")
                 }
                 FloatingActionButton(onClick = { navController.navigate("add_task") }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add a Wee Task")
+                    Icon(Icons.Default.Add, contentDescription = "Crack On")
                 }
             }
         },
@@ -74,7 +74,6 @@ fun MainScreen() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.TaskList.route) {
-                // The FABs are now in the MainScreen's Scaffold, so this lambda is no longer needed here.
                 TaskListScreen(onAddTaskClicked = {})
             }
             composable(Screen.KitchenDashboard.route) {
