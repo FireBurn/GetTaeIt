@@ -35,4 +35,13 @@ class SettingsViewModel @Inject constructor(
             geofenceManager.addWorkGeofence(location.latitude, location.longitude)
         }
     }
+
+    fun clearWorkLocation() {
+        viewModelScope.launch {
+            val currentPrefs = userPreferences.first()
+            val updatedPrefs = currentPrefs.copy(workLocation = null)
+            userPreferencesRepository.updateUserPreferences(updatedPrefs)
+            geofenceManager.removeWorkGeofence()
+        }
+    }
 }
