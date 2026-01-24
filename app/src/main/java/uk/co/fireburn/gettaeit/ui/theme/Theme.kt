@@ -21,7 +21,7 @@ private val DarkColorScheme = darkColorScheme(
     secondary = IrnBruOrange,
     tertiary = LochBlue,
     background = Color(0xFF1C1B1F),
-    surface = Color(0xFF1C1B1F)
+    surface = Color(0xFF1C1B1F),
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -29,7 +29,7 @@ private val LightColorScheme = lightColorScheme(
     secondary = IrnBruOrange,
     tertiary = LochBlue,
     background = MistGrey,
-    surface = Color.White
+    surface = Color.White,
 )
 
 @Composable

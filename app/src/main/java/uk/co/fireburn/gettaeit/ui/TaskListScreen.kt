@@ -69,17 +69,19 @@ fun TaskItem(
     onCompletedChange: (Boolean) -> Unit
 ) {
     val alpha by animateFloatAsState(
-        targetValue = if (task.isCompleted) 0.6f else 1f,
+        targetValue = if (task.isCompleted) 0.5f else 1f,
         label = "alpha"
     )
     val textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null
     val cardColor =
         if (task.context == TaskContext.WORK) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+    val startPadding = if (task.dependencyIds.isNotEmpty()) 32.dp else 0.dp
 
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 4.dp, horizontal = 8.dp)
+            .padding(start = startPadding)
             .alpha(alpha),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
