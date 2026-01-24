@@ -7,7 +7,6 @@ import kotlinx.coroutines.launch
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
 import uk.co.fireburn.gettaeit.shared.domain.scheduling.SmartMealService
-import java.util.Calendar
 import javax.inject.Inject
 
 @HiltViewModel
@@ -19,22 +18,13 @@ class KitchenViewModel @Inject constructor(
     fun scheduleMeal(
         title: String,
         description: String?,
-        year: Int,
-        month: Int,
-        day: Int,
-        hour: Int,
-        minute: Int
+        timestamp: Long
     ) {
         viewModelScope.launch {
-            val calendar = Calendar.getInstance().apply {
-                set(year, month, day, hour, minute)
-            }
-            val dueDate = calendar.timeInMillis
-
             val mainMealEvent = TaskEntity(
                 title = title,
                 description = description,
-                dueDate = dueDate,
+                dueDate = timestamp,
                 locationTrigger = null,
                 wifiTrigger = null,
                 offsetReferenceId = null,
