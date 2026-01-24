@@ -59,6 +59,7 @@ class MainViewModel @Inject constructor(
                     locationTrigger = null,
                     wifiTrigger = null,
                     offsetReferenceId = null,
+                    offsetDuration = null,
                     dueDate = null
                 )
                 taskRepository.addTask(parentTask)
@@ -72,6 +73,7 @@ class MainViewModel @Inject constructor(
                         locationTrigger = null,
                         wifiTrigger = null,
                         offsetReferenceId = null,
+                        offsetDuration = null,
                         dueDate = null
                     )
                     taskRepository.addTask(newTask)

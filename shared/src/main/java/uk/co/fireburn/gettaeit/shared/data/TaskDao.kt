@@ -10,8 +10,11 @@ import java.util.UUID
 
 @Dao
 interface TaskDao {
-    @Query("SELECT * FROM tasks")
-    fun getAllTasks(): Flow<List<TaskEntity>>
+    @Query("SELECT * FROM tasks WHERE userId = :userId")
+    fun getAllTasksForUser(userId: String): Flow<List<TaskEntity>>
+
+    @Query("SELECT * FROM tasks WHERE userId IS NULL")
+    fun getAllLocalTasks(): Flow<List<TaskEntity>>
 
     @Query("SELECT * FROM tasks WHERE id = :id")
     fun getTask(id: UUID): Flow<TaskEntity>

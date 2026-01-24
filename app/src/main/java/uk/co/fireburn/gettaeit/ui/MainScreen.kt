@@ -10,6 +10,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -18,63 +19,71 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import uk.co.fireburn.gettaeit.shared.domain.AuthRepository
 import uk.co.fireburn.gettaeit.ui.navigation.Screen
 
 @Composable
-fun MainScreen() {
+fun MainScreen(
+    onSignInClick: () -> Unit,
+    authRepository: AuthRepository
+) {
+    val currentUser by authRepository.currentUser.collectAsState(initial = null)
     val navController = rememberNavController()
     val navItems = listOf(
         Screen.TaskList,
         Screen.KitchenDashboard,
         Screen.Settings
     )
+    if (currentUser == null) {
+        LoginScreen(authRepository = authRepository, onSignInClick = onSignInClick)
+    } else {
+        Scaffold(
+            floatingActionButton = {
+                FloatingActionButton(onClick = { navController.navigate("add_task") }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add a Wee Task")
+                }
+            },
+            bottomBar = {
+                NavigationBar {
+                    val navBackStackEntry by navController.currentBackStackEntryAsState()
+                    val currentDestination = navBackStackEntry?.destination
 
-    Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(onClick = { navController.navigate("add_task") }) {
-                Icon(Icons.Default.Add, contentDescription = "Add a Wee Task")
-            }
-        },
-        bottomBar = {
-            NavigationBar {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentDestination = navBackStackEntry?.destination
-
-                navItems.forEach { screen ->
-                    NavigationBarItem(
-                        icon = { Icon(screen.icon, contentDescription = screen.label) },
-                        label = { Text(screen.label) },
-                        selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                        onClick = {
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+                    navItems.forEach { screen ->
+                        NavigationBarItem(
+                            icon = { Icon(screen.icon, contentDescription = screen.label) },
+                            label = { Text(screen.label) },
+                            selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                            onClick = {
+                                navController.navigate(screen.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
-        }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.TaskList.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(Screen.TaskList.route) {
-                TaskListScreen(onAddTaskClicked = { navController.navigate("add_task") })
-            }
-            composable(Screen.KitchenDashboard.route) {
-                KitchenDashboardScreen()
-            }
-            composable(Screen.Settings.route) {
-                SettingsScreen()
-            }
-            composable("add_task") {
-                AddTaskScreen(onTaskAdded = { navController.popBackStack() })
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = Screen.TaskList.route,
+                modifier = Modifier.padding(innerPadding)
+            ) {
+                composable(Screen.TaskList.route) {
+                    TaskListScreen(onAddTaskClicked = { navController.navigate("add_task") })
+                }
+                composable(Screen.KitchenDashboard.route) {
+                    KitchenDashboardScreen()
+                }
+                composable(Screen.Settings.route) {
+                    SettingsScreen()
+                }
+                composable("add_task") {
+                    AddTaskScreen(onTaskAdded = { navController.popBackStack() })
+                }
             }
         }
     }

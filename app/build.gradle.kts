@@ -93,5 +93,7 @@ dependencies {
 
     // Firebase
     implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth.ktx)
     implementation(libs.firebase.crashlytics)
+    implementation(libs.play.services.auth)
 }

@@ -14,6 +14,7 @@ enum class TaskContext {
 @Entity(tableName = "tasks")
 data class TaskEntity(
     @PrimaryKey val id: UUID = UUID.randomUUID(),
+    val userId: String? = null,
     val title: String,
     val description: String?,
     val isCompleted: Boolean = false,
@@ -23,5 +24,6 @@ data class TaskEntity(
     val locationTrigger: LatLng?,
     val wifiTrigger: String?, // SSID
     val offsetReferenceId: UUID?, // For linking prep-tasks to a main event
+    val offsetDuration: Long?, // In milliseconds
     val dueDate: Long? // Store as timestamp
 )

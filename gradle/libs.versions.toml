@@ -19,6 +19,7 @@ firebaseBom = "32.7.4"
 generativeai = "0.1.1"
 workRuntimeKtx = "2.9.0"
 playServicesLocation = "21.2.0"
+playServicesAuth = "21.5.0"
 wearCompose = "1.4.0"
 playServicesWearable = "18.2.0"
 playServicesMaps = "18.2.0"
@@ -55,6 +56,7 @@ firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashly
 generativeai = { group = "com.google.ai.client.generativeai", name = "generativeai", version.ref = "generativeai" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntimeKtx" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
 play-services-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "playServicesMaps" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 androidx-wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wearCompose" }
