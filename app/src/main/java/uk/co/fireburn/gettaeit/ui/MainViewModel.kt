@@ -15,7 +15,7 @@ import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 import uk.co.fireburn.gettaeit.shared.domain.AppMode
 import uk.co.fireburn.gettaeit.shared.domain.ContextManager
 import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
-import uk.co.fireburn.gettaeit.shared.domain.ai.GeminiService
+import uk.co.fireburn.gettaeit.shared.domain.ai.HybridTaskService
 import java.util.UUID
 import javax.inject.Inject
 
@@ -23,7 +23,7 @@ import javax.inject.Inject
 class MainViewModel @Inject constructor(
     private val taskRepository: TaskRepository,
     private val contextManager: ContextManager,
-    private val geminiService: GeminiService,
+    private val hybridTaskService: HybridTaskService,
     private val dataLayerSync: DataLayerSync
 ) : ViewModel() {
 
@@ -51,7 +51,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             _isBreakingDownTask.value = true
             try {
-                val subTasks = geminiService.breakdownTask(prompt)
+                val subTasks = hybridTaskService.generateSubtasks(prompt)
                 val parentTaskId = UUID.randomUUID()
                 val parentTask = TaskEntity(
                     id = parentTaskId,
@@ -69,7 +69,7 @@ class MainViewModel @Inject constructor(
                 subTasks.forEach { subTask ->
                     val newTask = TaskEntity(
                         title = subTask.title,
-                        description = subTask.description,
+                        description = subTask.icon,
                         context = if (appMode.value == AppMode.WORK) TaskContext.WORK else TaskContext.PERSONAL,
                         dependencyIds = listOf(parentTaskId),
                         locationTrigger = null,
@@ -87,27 +87,6 @@ class MainViewModel @Inject constructor(
     }
 
     fun addTasksFromVoice(prompt: String) {
-        viewModelScope.launch {
-            _isParsingVoice.value = true
-            try {
-                val parsedTasks = geminiService.parseVoiceInput(prompt)
-                parsedTasks.forEach { parsedTask ->
-                    val newTask = TaskEntity(
-                        title = parsedTask.title,
-                        description = "Added by voice",
-                        context = parsedTask.context,
-                        locationTrigger = null,
-                        wifiTrigger = null,
-                        offsetReferenceId = null,
-                        offsetDuration = null,
-                        dueDate = null
-                    )
-                    taskRepository.addTask(newTask)
-                }
-            } finally {
-                _isParsingVoice.value = false
-            }
-        }
     }
 
     fun setTaskCompleted(task: TaskEntity, completed: Boolean) {

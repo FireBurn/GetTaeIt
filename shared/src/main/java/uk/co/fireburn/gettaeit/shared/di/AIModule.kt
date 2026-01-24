@@ -4,8 +4,9 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import uk.co.fireburn.gettaeit.shared.domain.UserPreferencesRepository
-import uk.co.fireburn.gettaeit.shared.domain.ai.GeminiService
+import uk.co.fireburn.gettaeit.shared.domain.ai.GeminiNanoStrategy
+import uk.co.fireburn.gettaeit.shared.domain.ai.HybridTaskService
+import uk.co.fireburn.gettaeit.shared.domain.ai.TemplateStrategy
 import javax.inject.Singleton
 
 @Module
@@ -14,7 +15,10 @@ object AIModule {
 
     @Provides
     @Singleton
-    fun provideGeminiService(userPreferencesRepository: UserPreferencesRepository): GeminiService {
-        return GeminiService(userPreferencesRepository)
+    fun provideHybridTaskService(
+        template: TemplateStrategy,
+        nano: GeminiNanoStrategy
+    ): HybridTaskService {
+        return HybridTaskService(template, nano)
     }
 }
