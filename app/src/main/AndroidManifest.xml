@@ -1,12 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Existing permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Notification permissions (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Exact alarms — required for precise reminder timing -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <!-- Reschedule alarms after reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Keep receiver alive while doing async DB work -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:name=".GetTaeItApplication"
@@ -25,6 +39,7 @@
             </intent-filter>
         </activity>
 
+        <!-- Existing receivers/services -->
         <receiver
             android:name="uk.co.fireburn.gettaeit.shared.GeofenceBroadcastReceiver"
             android:exported="true" />
@@ -40,6 +55,26 @@
                     android:scheme="wear" />
             </intent-filter>
         </service>
+
+        <!-- Fires when an alarm slot is due → posts the notification -->
+        <receiver
+            android:name="uk.co.fireburn.gettaeit.notifications.ReminderReceiver"
+            android:exported="false" />
+
+        <!-- Handles "Feenisht ✓" and "Stickit ✗" notification button taps -->
+        <receiver
+            android:name="uk.co.fireburn.gettaeit.notifications.TaskActionReceiver"
+            android:exported="false" />
+
+        <!-- Reschedules alarms after reboot -->
+        <receiver
+            android:name="uk.co.fireburn.gettaeit.notifications.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
 
 @Database(
     entities = [TaskEntity::class, UserPreferences::class],
-    version = 7,          // bump whenever the schema changes
+    version = 10,          // bump whenever the schema changes
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -1,6 +1,7 @@
 package uk.co.fireburn.gettaeit.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
@@ -8,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,12 +23,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
@@ -34,20 +37,23 @@ import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Snooze
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.Work
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,8 +63,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -69,97 +77,109 @@ import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 import uk.co.fireburn.gettaeit.shared.domain.AppMode
 import uk.co.fireburn.gettaeit.shared.domain.RecurrenceEngine
 
-// ─── Context banner colours ──────────────────────────────────────────────────
-private val WorkPrimary = Color(0xFF0065BD)     // Loch Blue
-private val WorkSurface = Color(0xFFE8F1FB)
-private val PersonalPrimary = Color(0xFF8D5CA5) // Thistle Purple
-private val PersonalSurface = Color(0xFFF5EEF8)
+// ─── Accent colours ───────────────────────────────────────────────────────────
+private val WorkPrimary = Color(0xFF0065BD)
+private val PersonalPrimary = Color(0xFF8D5CA5)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskListScreen(
     viewModel: MainViewModel = hiltViewModel(),
-    recurrenceEngine: RecurrenceEngine = hiltViewModel<MainViewModel>()
-        .let { RecurrenceEngine() },
+    recurrenceEngine: RecurrenceEngine = hiltViewModel<MainViewModel>().let { RecurrenceEngine() },
     onAddTaskClicked: () -> Unit
 ) {
     val tasks by viewModel.tasks.collectAsState()
     val appMode by viewModel.appMode.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // ── Context mode banner ──────────────────────────────────────────────
         ContextBanner(mode = appMode)
 
-        // ── Task list ────────────────────────────────────────────────────────
         if (tasks.isEmpty()) {
             EmptyState(mode = appMode)
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(tasks, key = { it.id }) { task ->
                     TaskCard(
                         task = task,
                         recurrenceEngine = recurrenceEngine,
                         onComplete = { viewModel.completeTask(task) },
+                        onCompleteWithTime = { mins -> viewModel.completeTaskWithTime(task, mins) },
                         onSnooze = { viewModel.snoozeTask(task) },
                         onSnoozeTomorrow = { viewModel.snoozeTomorrow(task) },
                         onDelete = { viewModel.deleteTask(task) },
                         getSubtasks = { viewModel.getSubtasks(task.id) },
-                        onCompleteSubtask = { sub -> viewModel.completeTask(sub) }
+                        onCompleteSubtask = { sub -> viewModel.completeTask(sub) },
+                        onCompleteSubtaskWithTime = { sub, mins ->
+                            viewModel.completeTaskWithTime(
+                                sub,
+                                mins
+                            )
+                        }
                     )
                 }
-                item { Spacer(Modifier.height(80.dp)) } // room for FAB
+                item { Spacer(Modifier.height(96.dp)) }
             }
         }
     }
 }
 
-// ─── Context banner ───────────────────────────────────────────────────────────
+// ─── Context banner — uses MaterialTheme so it works in dark mode ─────────────
 
 @Composable
 private fun ContextBanner(mode: AppMode) {
-    val (bg, icon, label, sub) = when (mode) {
-        AppMode.WORK -> Quad(WorkSurface, Icons.Filled.Work, "Work Mode", "Showing your work tasks")
+    val (icon, label, sub, accent) = when (mode) {
+        AppMode.WORK -> Quad(Icons.Filled.Work, "Work Mode", "Showing your work tasks", WorkPrimary)
         AppMode.PERSONAL -> Quad(
-            PersonalSurface,
             Icons.Filled.Home,
             "Home Mode",
-            "Your personal tasks"
+            "Your personal tasks",
+            PersonalPrimary
         )
 
         AppMode.COMMUTE -> Quad(
-            Color(0xFFFFF3E0),
             Icons.Filled.DirectionsCar,
             "On The Move",
-            "Top 3 tasks for the road"
+            "Top 3 tasks for the road",
+            Color(0xFFE65100)
         )
     }
 
-    Surface(color = bg, tonalElevation = 0.dp) {
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, tonalElevation = 0.dp) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                icon, contentDescription = null,
-                tint = if (mode == AppMode.WORK) WorkPrimary else PersonalPrimary,
-                modifier = Modifier.size(20.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(accent.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
             Column {
                 Text(
                     label,
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    sub, style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    sub,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
         }
@@ -174,46 +194,59 @@ fun TaskCard(
     task: TaskEntity,
     recurrenceEngine: RecurrenceEngine,
     onComplete: () -> Unit,
+    onCompleteWithTime: (Int?) -> Unit,
     onSnooze: () -> Unit,
     onSnoozeTomorrow: () -> Unit,
     onDelete: () -> Unit,
     getSubtasks: () -> kotlinx.coroutines.flow.StateFlow<List<TaskEntity>>,
-    onCompleteSubtask: (TaskEntity) -> Unit
+    onCompleteSubtask: (TaskEntity) -> Unit,
+    onCompleteSubtaskWithTime: (TaskEntity, Int?) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var showTimeDlg by remember { mutableStateOf(false) }
     val subtasks by getSubtasks().collectAsState()
 
     val accentColor = if (task.context == TaskContext.WORK) WorkPrimary else PersonalPrimary
     val hasSubtasks = subtasks.isNotEmpty()
     val blockedCount = task.dependencyIds.size
+    val doneCount = subtasks.count { it.isCompleted }
+    val arrowAngle by animateFloatAsState(if (expanded) 180f else 0f, label = "arrow")
+
+    if (showTimeDlg) {
+        CompletionTimeDialog(
+            estimatedMinutes = task.estimatedMinutes,
+            onConfirm = { mins -> onCompleteWithTime(mins); showTimeDlg = false },
+            onSkip = { onComplete(); showTimeDlg = false },
+            onDismiss = { showTimeDlg = false }
+        )
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column {
-            // ── Left accent bar + main row ────────────────────────────────────
-            Row(modifier = Modifier.fillMaxWidth()) {
-                // Context colour accent strip
+            Row(modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)) {
+                // Accent strip — fillMaxHeight works because Row uses IntrinsicSize.Min
                 Box(
                     modifier = Modifier
                         .width(4.dp)
                         .fillMaxHeight()
-                        .background(accentColor)
                         .clip(RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
+                        .background(accentColor)
                 )
 
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(start = 12.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
+                        .padding(start = 12.dp, end = 4.dp, top = 12.dp, bottom = 12.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.Top) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = task.title,
@@ -233,69 +266,99 @@ fun TaskCard(
                             }
                         }
 
-                        // Complete checkbox
-                        Checkbox(
-                            checked = task.isCompleted,
-                            onCheckedChange = { if (!task.isCompleted) onComplete() },
-                            colors = CheckboxDefaults.colors(checkedColor = accentColor)
-                        )
+                        // Complete button
+                        IconButton(
+                            onClick = {
+                                if (!task.isCompleted) {
+                                    if (task.estimatedMinutes != null) showTimeDlg = true
+                                    else onComplete()
+                                }
+                            },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                if (task.isCompleted) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
+                                contentDescription = "Complete",
+                                tint = if (task.isCompleted) accentColor
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
 
-                    // ── Metadata chips row ───────────────────────────────────
+                    // Chips
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.padding(top = 6.dp)
                     ) {
-                        // Recurrence chip
                         if (task.recurrence.type != RecurrenceType.NONE) {
                             MetaChip(
-                                icon = Icons.Filled.Repeat,
-                                label = recurrenceEngine.describeRecurrence(task.recurrence),
-                                tint = accentColor
+                                Icons.Filled.Repeat,
+                                recurrenceEngine.describeRecurrence(task.recurrence),
+                                accentColor
                             )
                         }
-
-                        // Priority pip
                         if (task.priority <= 2) {
-                            MetaChip(
-                                icon = Icons.Filled.PriorityHigh,
-                                label = "Urgent",
-                                tint = Color(0xFFD32F2F)
-                            )
+                            MetaChip(Icons.Filled.PriorityHigh, "Urgent", Color(0xFFD32F2F))
                         }
-
-                        // Subtasks indicator
-                        if (hasSubtasks) {
-                            val doneCount = subtasks.count { it.isCompleted }
-                            MetaChip(
-                                icon = Icons.Filled.AccountTree,
-                                label = "$doneCount/${subtasks.size}",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                onClick = { expanded = !expanded }
-                            )
+                        task.estimatedMinutes?.let {
+                            MetaChip(Icons.Filled.Timer, formatMinutes(it), accentColor)
                         }
-
-                        // Blocked-by indicator
                         if (blockedCount > 0) {
                             MetaChip(
-                                icon = Icons.Filled.Lock,
-                                label = "Blocked by $blockedCount",
-                                tint = Color(0xFFE65100)
+                                Icons.Filled.Lock,
+                                "Blocked by $blockedCount",
+                                Color(0xFFE65100)
                             )
                         }
-
-                        // Streak
                         if (task.streakCount > 1) {
                             MetaChip(
-                                icon = Icons.Filled.LocalFireDepartment,
-                                label = "×${task.streakCount}",
-                                tint = Color(0xFFFF6F00)
+                                Icons.Filled.LocalFireDepartment,
+                                "×${task.streakCount}",
+                                Color(0xFFFF6F00)
+                            )
+                        }
+                    }
+
+                    // Subtask progress bar + expand trigger
+                    if (hasSubtasks) {
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { expanded = !expanded }
+                                .padding(vertical = 2.dp)
+                        ) {
+                            LinearProgressIndicator(
+                                progress = { if (subtasks.isEmpty()) 0f else doneCount.toFloat() / subtasks.size },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp)),
+                                color = accentColor,
+                                trackColor = accentColor.copy(alpha = 0.15f)
+                            )
+                            Text(
+                                "$doneCount/${subtasks.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = accentColor,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Icon(
+                                Icons.Filled.KeyboardArrowDown,
+                                contentDescription = if (expanded) "Collapse" else "Expand",
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .rotate(arrowAngle),
+                                tint = accentColor
                             )
                         }
                     }
                 }
 
-                // ── Context menu ─────────────────────────────────────────────
+                // ⋮ menu
                 Box {
                     IconButton(onClick = { showMenu = true }) {
                         Icon(
@@ -331,7 +394,7 @@ fun TaskCard(
                 }
             }
 
-            // ── Subtask expansion ─────────────────────────────────────────────
+            // Subtask list
             AnimatedVisibility(
                 visible = expanded && hasSubtasks,
                 enter = expandVertically(),
@@ -340,12 +403,16 @@ fun TaskCard(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                        .padding(start = 20.dp, end = 16.dp, bottom = 8.dp, top = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     subtasks.forEach { sub ->
-                        SubtaskRow(subtask = sub, onComplete = { onCompleteSubtask(sub) })
+                        SubtaskRow(
+                            subtask = sub,
+                            accent = accentColor,
+                            onComplete = { if (!sub.isCompleted) onCompleteSubtask(sub) }
+                        )
                     }
                 }
             }
@@ -353,32 +420,92 @@ fun TaskCard(
     }
 }
 
-// ─── Subtask row ──────────────────────────────────────────────────────────────
+// ─── Subtask row — prominent ──────────────────────────────────────────────────
 
 @Composable
-private fun SubtaskRow(subtask: TaskEntity, onComplete: () -> Unit) {
+private fun SubtaskRow(subtask: TaskEntity, accent: Color, onComplete: () -> Unit) {
+    val done = subtask.isCompleted
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { if (!subtask.isCompleted) onComplete() }
-            .padding(vertical = 4.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                if (done) accent.copy(alpha = 0.07f)
+                else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+            )
+            .clickable { if (!done) onComplete() }
+            .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         Icon(
-            if (subtask.isCompleted) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
+            if (done) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
             contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = if (subtask.isCompleted) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant
+            modifier = Modifier.size(20.dp),
+            tint = if (done) accent else MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(10.dp))
         Text(
             text = subtask.title,
             style = MaterialTheme.typography.bodyMedium,
-            textDecoration = if (subtask.isCompleted) TextDecoration.LineThrough else null,
-            color = if (subtask.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant
-            else MaterialTheme.colorScheme.onSurface
+            fontWeight = if (done) FontWeight.Normal else FontWeight.Medium,
+            textDecoration = if (done) TextDecoration.LineThrough else null,
+            color = if (done) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
         )
+        subtask.estimatedMinutes?.let {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = formatMinutes(it),
+                style = MaterialTheme.typography.labelSmall,
+                color = accent.copy(alpha = if (done) 0.4f else 0.85f),
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
+}
+
+// ─── Completion time dialog ───────────────────────────────────────────────────
+
+@Composable
+private fun CompletionTimeDialog(
+    estimatedMinutes: Int?,
+    onConfirm: (Int?) -> Unit,
+    onSkip: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var input by remember { mutableStateOf(estimatedMinutes?.toString() ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("How long did that take? ⏱️") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (estimatedMinutes != null) {
+                    Text(
+                        "We guessed ${formatMinutes(estimatedMinutes)}. Help us get better!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it.filter { c -> c.isDigit() } },
+                    label = { Text("Minutes") },
+                    suffix = { Text("min") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(input.toIntOrNull()) }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onSkip) { Text("Skip") }
+        }
+    )
 }
 
 // ─── Meta chip ────────────────────────────────────────────────────────────────
@@ -390,9 +517,9 @@ private fun MetaChip(
     tint: Color,
     onClick: (() -> Unit)? = null
 ) {
-    val modifier = if (onClick != null) Modifier.clickable { onClick() } else Modifier
+    val mod = if (onClick != null) Modifier.clickable { onClick() } else Modifier
     Row(
-        modifier = modifier
+        modifier = mod
             .clip(RoundedCornerShape(6.dp))
             .background(tint.copy(alpha = 0.1f))
             .padding(horizontal = 6.dp, vertical = 2.dp),
@@ -413,13 +540,9 @@ fun EmptyState(mode: AppMode = AppMode.PERSONAL) {
         AppMode.PERSONAL -> Triple("🛋️", "Nae bother!", "Chill oot. Yer list is empty.")
         AppMode.COMMUTE -> Triple("🚗", "Safe travels!", "Nothing urgent for the road.")
     }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        contentAlignment = Alignment.Center
-    ) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .padding(32.dp), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -431,14 +554,22 @@ fun EmptyState(mode: AppMode = AppMode.PERSONAL) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                body, style = MaterialTheme.typography.bodyMedium,
+                body,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
 
-// ── Helper to destructure a 4-tuple ──────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+private fun formatMinutes(minutes: Int): String = when {
+    minutes < 60 -> "${minutes}m"
+    minutes % 60 == 0 -> "${minutes / 60}h"
+    else -> "${minutes / 60}h ${minutes % 60}m"
+}
+
 private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
 
 private operator fun <A, B, C, D> Quad<A, B, C, D>.component1() = a

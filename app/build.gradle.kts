@@ -80,4 +80,5 @@ dependencies {
 
     // Permissions
     implementation(libs.accompanist.permissions)
+    implementation(libs.androidx.work.runtime.ktx)
 }

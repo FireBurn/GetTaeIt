@@ -1,14 +1,17 @@
 package uk.co.fireburn.gettaeit.ui
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import uk.co.fireburn.gettaeit.notifications.ReminderScheduler
 import uk.co.fireburn.gettaeit.shared.DataLayerSync
 import uk.co.fireburn.gettaeit.shared.data.MissedBehaviour
 import uk.co.fireburn.gettaeit.shared.data.RecurrenceConfig
@@ -19,13 +22,10 @@ import uk.co.fireburn.gettaeit.shared.domain.AppMode
 import uk.co.fireburn.gettaeit.shared.domain.ContextManager
 import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
 import uk.co.fireburn.gettaeit.shared.domain.ai.HybridTaskService
+import java.util.Calendar
 import java.util.UUID
 import javax.inject.Inject
 
-/**
- * UI state for the add/edit task sheet.
- * Defaults represent a sensible "new personal task" with no recurrence.
- */
 data class AddTaskUiState(
     val title: String = "",
     val description: String = "",
@@ -39,8 +39,9 @@ data class AddTaskUiState(
     val dueDate: Long? = null,
     val parentId: UUID? = null,
     val dependencyIds: List<UUID> = emptyList(),
-    /** AI-generated subtask titles ready to be previewed before saving */
+    val timesPerDay: Int = 1,
     val suggestedSubtasks: List<String> = emptyList(),
+    val suggestedSubtaskMinutes: List<Int?> = emptyList(),
     val isGeneratingSubtasks: Boolean = false
 )
 
@@ -49,10 +50,12 @@ class MainViewModel @Inject constructor(
     private val taskRepository: TaskRepository,
     private val contextManager: ContextManager,
     private val hybridTaskService: HybridTaskService,
-    private val dataLayerSync: DataLayerSync
+    private val dataLayerSync: DataLayerSync,
+    private val reminderScheduler: ReminderScheduler,
+    @param:ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
-    // ── Streams ──────────────────────────────────────────────────────────────
+    // ── Streams ───────────────────────────────────────────────────────────────
 
     val tasks: StateFlow<List<TaskEntity>> = taskRepository.getTopLevelTasksForCurrentMode()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -60,7 +63,11 @@ class MainViewModel @Inject constructor(
     val appMode: StateFlow<AppMode> = contextManager.appMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppMode.PERSONAL)
 
-    // ── Add task sheet state ─────────────────────────────────────────────────
+    /** All active top-level tasks — used for the dependency/blocker picker. */
+    val allTasks: StateFlow<List<TaskEntity>> = taskRepository.getAllActiveToplevelTasks()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // ── Add task sheet state ──────────────────────────────────────────────────
 
     private val _addTaskState = MutableStateFlow(AddTaskUiState())
     val addTaskState: StateFlow<AddTaskUiState> = _addTaskState.asStateFlow()
@@ -75,13 +82,8 @@ class MainViewModel @Inject constructor(
         )
     }
 
-    // ── AI subtask suggestions ───────────────────────────────────────────────
+    // ── AI subtask + scheduling suggestions ──────────────────────────────────
 
-    /**
-     * Triggers AI breakdown of the current task title and populates
-     * [AddTaskUiState.suggestedSubtasks] for the user to review.
-     * Context is auto-detected if not already explicitly set.
-     */
     fun requestSubtaskBreakdown() {
         val title = _addTaskState.value.title.ifBlank { return }
         viewModelScope.launch {
@@ -89,10 +91,9 @@ class MainViewModel @Inject constructor(
             try {
                 val results = hybridTaskService.generateSubtasks(title)
                 val detectedContext = hybridTaskService.detectContext(title)
-
                 _addTaskState.value = _addTaskState.value.copy(
                     suggestedSubtasks = results.map { it.title },
-                    // Auto-fill context only if user left it as ANY
+                    suggestedSubtaskMinutes = results.map { it.estimatedMinutes },
                     context = if (_addTaskState.value.context == TaskContext.ANY)
                         detectedContext else _addTaskState.value.context
                 )
@@ -102,29 +103,52 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Auto-fills scheduling fields from the title using the AI template.
+     * Called when the user finishes typing a title and hasn't set a schedule yet.
+     */
+    fun autoScheduleFromTitle() {
+        val title = _addTaskState.value.title.ifBlank { return }
+        viewModelScope.launch {
+            val parsed = hybridTaskService.parsePrompt(title).firstOrNull() ?: return@launch
+            val rec = parsed.suggestedRecurrence ?: return@launch
+            // Only auto-fill if user hasn't already set a recurrence
+            if (_addTaskState.value.recurrenceType != RecurrenceType.NONE) return@launch
+            _addTaskState.value = _addTaskState.value.copy(
+                recurrenceType = rec.type,
+                recurrenceInterval = rec.interval,
+                recurrenceDaysOfWeek = rec.daysOfWeek,
+                missedBehaviour = rec.missedBehaviour,
+                preferredTimeOfDayMinutes = rec.preferredTimeOfDayMinutes
+                    ?: _addTaskState.value.preferredTimeOfDayMinutes,
+                timesPerDay = rec.timesPerDay
+            )
+        }
+    }
+
     fun removeSuggestedSubtask(index: Int) {
         _addTaskState.value = _addTaskState.value.copy(
             suggestedSubtasks = _addTaskState.value.suggestedSubtasks.toMutableList()
-                .also { it.removeAt(index) }
+                .also { it.removeAt(index) },
+            suggestedSubtaskMinutes = _addTaskState.value.suggestedSubtaskMinutes.toMutableList()
+                .also { if (index < it.size) it.removeAt(index) }
         )
     }
 
-    // ── Save task ────────────────────────────────────────────────────────────
+    // ── Save task ─────────────────────────────────────────────────────────────
 
-    /** Saves the current [AddTaskUiState] as a task (+ subtasks if any). */
     fun saveTask() {
         val state = _addTaskState.value
         if (state.title.isBlank()) return
-
         viewModelScope.launch {
             val recurrenceConfig = RecurrenceConfig(
                 type = state.recurrenceType,
                 interval = state.recurrenceInterval,
                 daysOfWeek = state.recurrenceDaysOfWeek,
                 missedBehaviour = state.missedBehaviour,
-                preferredTimeOfDayMinutes = state.preferredTimeOfDayMinutes
+                preferredTimeOfDayMinutes = state.preferredTimeOfDayMinutes,
+                timesPerDay = state.timesPerDay
             )
-
             val parentId = UUID.randomUUID()
             val parentTask = TaskEntity(
                 id = parentId,
@@ -139,33 +163,55 @@ class MainViewModel @Inject constructor(
                 isSubtask = state.parentId != null
             )
             taskRepository.addTask(parentTask)
-
-            // Save AI-confirmed subtasks
             if (state.suggestedSubtasks.isNotEmpty()) {
-                val subtasks = state.suggestedSubtasks.mapIndexed { idx, title ->
+                taskRepository.addAll(state.suggestedSubtasks.mapIndexed { idx, title ->
                     TaskEntity(
                         title = title,
                         context = state.context,
                         priority = state.priority,
                         parentId = parentId,
                         isSubtask = true,
-                        // Each subtask depends on the previous one (sequential dependency)
-                        dependencyIds = if (idx == 0) emptyList() else listOf()
+                        estimatedMinutes = state.suggestedSubtaskMinutes.getOrNull(idx),
+                        dependencyIds = emptyList()
                     )
-                }
-                taskRepository.addAll(subtasks)
+                })
             }
-
+            // Schedule reminders for recurring tasks
+            if (parentTask.recurrence.type != RecurrenceType.NONE) {
+                reminderScheduler.scheduleTask(appContext, parentTask)
+            }
             resetAddTaskState()
         }
     }
 
-    // ── Task actions ─────────────────────────────────────────────────────────
+    // ── Task actions ──────────────────────────────────────────────────────────
 
     fun completeTask(task: TaskEntity) {
         viewModelScope.launch {
             taskRepository.completeTask(task)
             dataLayerSync.sendTaskUpdate(task.id, true)
+            // Cancel today's remaining alarms; recurring tasks will be rescheduled by BootReceiver/next launch
+            reminderScheduler.cancelTask(appContext, task)
+        }
+    }
+
+    /**
+     * Complete a subtask, then auto-complete the parent if all siblings are done.
+     */
+    fun completeSubtask(task: TaskEntity) {
+        viewModelScope.launch {
+            taskRepository.completeTask(task)
+            dataLayerSync.sendTaskUpdate(task.id, true)
+            task.parentId?.let { taskRepository.autoCompleteParentIfDone(it) }
+        }
+    }
+
+    fun completeTaskWithTime(task: TaskEntity, actualMinutes: Int?) {
+        viewModelScope.launch {
+            taskRepository.completeTask(task.copy(actualMinutes = actualMinutes))
+            dataLayerSync.sendTaskUpdate(task.id, true)
+            // If it's a subtask, check parent too
+            task.parentId?.let { taskRepository.autoCompleteParentIfDone(it) }
         }
     }
 
@@ -176,10 +222,6 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Snooze a task.
-     * @param hoursAhead how many hours from now to snooze until (default 2h)
-     */
     fun snoozeTask(task: TaskEntity, hoursAhead: Long = 2L) {
         viewModelScope.launch {
             val untilMs = System.currentTimeMillis() + hoursAhead * 3_600_000L
@@ -189,13 +231,10 @@ class MainViewModel @Inject constructor(
 
     fun snoozeTomorrow(task: TaskEntity) {
         viewModelScope.launch {
-            // Snooze until 9am tomorrow
-            val cal = java.util.Calendar.getInstance().apply {
-                add(java.util.Calendar.DAY_OF_YEAR, 1)
-                set(java.util.Calendar.HOUR_OF_DAY, 9)
-                set(java.util.Calendar.MINUTE, 0)
-                set(java.util.Calendar.SECOND, 0)
-                set(java.util.Calendar.MILLISECOND, 0)
+            val cal = Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_YEAR, 1)
+                set(Calendar.HOUR_OF_DAY, 9)
+                set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
             }
             taskRepository.snoozeTask(task, cal.timeInMillis)
         }
@@ -205,15 +244,72 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { taskRepository.deleteTask(task) }
     }
 
-    // Subtasks for a parent
     fun getSubtasks(parentId: UUID) = taskRepository.getSubtasks(parentId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Legacy compat — kept so VoiceInputScreen doesn't need a change yet
-    val isBreakingDownTask: StateFlow<Boolean>
-        get() = _addTaskState.asStateFlow()
-            .let { MutableStateFlow(it.value.isGeneratingSubtasks) }
+    // ── Voice input ───────────────────────────────────────────────────────────
+
     val isParsingVoice = MutableStateFlow(false)
-    fun addTasksFromVoice(prompt: String) { /* TODO */
+
+    /**
+     * Parses a voice/text prompt using the full AI template (supports multi-task expansion,
+     * auto-scheduling, and subtasks). Saves all resulting tasks and calls [onComplete].
+     */
+    fun addTasksFromVoice(prompt: String, onComplete: () -> Unit = {}) {
+        if (prompt.isBlank()) return
+        viewModelScope.launch {
+            isParsingVoice.value = true
+            try {
+                val parsedList = hybridTaskService.parsePrompt(prompt)
+                parsedList.forEach { parsed ->
+                    val context = when {
+                        parsed.suggestedContext != TaskContext.ANY -> parsed.suggestedContext
+                        appMode.value == AppMode.WORK -> TaskContext.WORK
+                        else -> TaskContext.PERSONAL
+                    }
+                    val recurrence = parsed.suggestedRecurrence
+                        ?: RecurrenceConfig(type = RecurrenceType.NONE)
+
+                    val parentId = UUID.randomUUID()
+                    taskRepository.addTask(
+                        TaskEntity(
+                            id = parentId,
+                            title = parsed.title,
+                            context = context,
+                            priority = 3,
+                            recurrence = recurrence,
+                            estimatedMinutes = parsed.estimatedMinutes
+                        )
+                    )
+                    if (parsed.subtasks.isNotEmpty()) {
+                        taskRepository.addAll(parsed.subtasks.map { result ->
+                            TaskEntity(
+                                title = result.title,
+                                context = context,
+                                priority = (3 + result.priorityOffset).coerceIn(1, 5),
+                                parentId = parentId,
+                                isSubtask = true,
+                                recurrence = RecurrenceConfig(type = RecurrenceType.NONE),
+                                estimatedMinutes = result.estimatedMinutes
+                            )
+                        })
+                    }
+                }
+            } finally {
+                isParsingVoice.value = false
+                onComplete()
+            }
+        }
+    }
+
+    /** Re-schedule all active recurring tasks (called e.g. after returning from Settings). */
+    fun rescheduleAllReminders() {
+        viewModelScope.launch {
+            taskRepository.getAllActiveToplevelTasks().collect { tasks ->
+                tasks.filter { it.recurrence.type != RecurrenceType.NONE }
+                    .forEach { reminderScheduler.scheduleTask(appContext, it) }
+                return@collect // only process first emission
+            }
+        }
     }
 }

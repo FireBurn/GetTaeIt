@@ -3,18 +3,23 @@ package uk.co.fireburn.gettaeit.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -23,6 +28,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import uk.co.fireburn.gettaeit.ui.navigation.Screen
+import uk.co.fireburn.gettaeit.ui.theme.ThistlePurple
 
 @Composable
 fun MainScreen() {
@@ -35,12 +41,31 @@ fun MainScreen() {
 
     Scaffold(
         floatingActionButton = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                FloatingActionButton(onClick = { navController.navigate("voice_add_task") }) {
-                    Icon(Icons.Default.Mic, contentDescription = "Blether")
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                // Smaller mic FAB
+                SmallFloatingActionButton(
+                    onClick = { navController.navigate("voice_add_task") },
+                    containerColor = ThistlePurple.copy(alpha = 0.85f),
+                    contentColor = Color.White,
+                    elevation = FloatingActionButtonDefaults.elevation(6.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Mic,
+                        contentDescription = "Add by voice",
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
-                FloatingActionButton(onClick = { navController.navigate("add_task") }) {
-                    Icon(Icons.Default.Add, contentDescription = "Crack On")
+                // Primary add FAB
+                FloatingActionButton(
+                    onClick = { navController.navigate("add_task") },
+                    containerColor = ThistlePurple,
+                    contentColor = Color.White,
+                    elevation = FloatingActionButtonDefaults.elevation(8.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add task")
                 }
             }
         },

@@ -3,6 +3,8 @@ package uk.co.fireburn.gettaeit.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -40,8 +43,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import uk.co.fireburn.gettaeit.shared.data.MissedBehaviour
@@ -56,6 +61,7 @@ fun AddTaskScreen(
     onTaskAdded: () -> Unit
 ) {
     val state by viewModel.addTaskState.collectAsState()
+    val allTasks by viewModel.allTasks.collectAsState()
     val scrollState = rememberScrollState()
 
     Scaffold(
@@ -89,7 +95,10 @@ fun AddTaskScreen(
             // ── Title ────────────────────────────────────────────────────────
             OutlinedTextField(
                 value = state.title,
-                onValueChange = { viewModel.updateAddTaskState { copy(title = it) } },
+                onValueChange = {
+                    viewModel.updateAddTaskState { copy(title = it) }
+                    if (it.length > 5) viewModel.autoScheduleFromTitle()
+                },
                 label = { Text("What needs tae be done?") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = false,
@@ -166,12 +175,10 @@ fun AddTaskScreen(
                 missedBehaviour = state.missedBehaviour,
                 daysOfWeek = state.recurrenceDaysOfWeek,
                 preferredTimeMinutes = state.preferredTimeOfDayMinutes,
+                timesPerDay = state.timesPerDay,
                 onTypeChange = {
                     viewModel.updateAddTaskState {
-                        copy(
-                            recurrenceType = it,
-                            recurrenceDaysOfWeek = emptyList()
-                        )
+                        copy(recurrenceType = it, recurrenceDaysOfWeek = emptyList())
                     }
                 },
                 onIntervalChange = { viewModel.updateAddTaskState { copy(recurrenceInterval = it) } },
@@ -183,8 +190,25 @@ fun AddTaskScreen(
                         copy(recurrenceDaysOfWeek = newDays)
                     }
                 },
-                onTimeChange = { viewModel.updateAddTaskState { copy(preferredTimeOfDayMinutes = it) } }
+                onTimeChange = { viewModel.updateAddTaskState { copy(preferredTimeOfDayMinutes = it) } },
+                onTimesPerDayChange = { viewModel.updateAddTaskState { copy(timesPerDay = it) } }
             )
+
+            // ── Blocker / dependency picker ───────────────────────────────────────
+            if (allTasks.isNotEmpty()) {
+                SectionLabel("Blocked by (optional)")
+                DependencyPicker(
+                    allTasks = allTasks.filter { it.id != java.util.UUID.fromString("00000000-0000-0000-0000-000000000000") }, // exclude self (title not saved yet)
+                    selectedIds = state.dependencyIds,
+                    onToggle = { id ->
+                        viewModel.updateAddTaskState {
+                            val newDeps =
+                                if (id in dependencyIds) dependencyIds - id else dependencyIds + id
+                            copy(dependencyIds = newDeps)
+                        }
+                    }
+                )
+            }
 
             // ── AI subtask suggestions ───────────────────────────────────────
             AnimatedVisibility(
@@ -213,11 +237,13 @@ private fun RecurrenceSection(
     missedBehaviour: MissedBehaviour,
     daysOfWeek: List<Int>,
     preferredTimeMinutes: Int?,
+    timesPerDay: Int,
     onTypeChange: (RecurrenceType) -> Unit,
     onIntervalChange: (Int) -> Unit,
     onMissedBehaviourChange: (MissedBehaviour) -> Unit,
     onDayToggle: (Int) -> Unit,
-    onTimeChange: (Int?) -> Unit
+    onTimeChange: (Int?) -> Unit,
+    onTimesPerDayChange: (Int) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         // Type row
@@ -265,6 +291,40 @@ private fun RecurrenceSection(
                         else -> ""
                     },
                     style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+
+        // ── Times per day ─────────────────────────────────────────────────────
+        if (recurrenceType == RecurrenceType.DAILY || recurrenceType == RecurrenceType.CUSTOM_DAYS) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Remind me", style = MaterialTheme.typography.bodyMedium)
+                IconButton(
+                    onClick = { if (timesPerDay > 1) onTimesPerDayChange(timesPerDay - 1) },
+                    modifier = Modifier.size(32.dp)
+                ) { Icon(Icons.Filled.Remove, null, modifier = Modifier.size(16.dp)) }
+                Text(
+                    "$timesPerDay×",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(
+                    onClick = { if (timesPerDay < 6) onTimesPerDayChange(timesPerDay + 1) },
+                    modifier = Modifier.size(32.dp)
+                ) { Icon(Icons.Filled.Add, null, modifier = Modifier.size(16.dp)) }
+                Text(
+                    when (timesPerDay) {
+                        1 -> "a day"
+                        2 -> "a day (morning + evening)"
+                        3 -> "a day (morning, lunch, evening)"
+                        4 -> "a day (morning, lunch, evening, bedtime)"
+                        else -> "times a day"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -412,6 +472,54 @@ private fun SubtaskPreviewSection(
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+@Composable
+private fun DependencyPicker(
+    allTasks: List<uk.co.fireburn.gettaeit.shared.data.TaskEntity>,
+    selectedIds: List<java.util.UUID>,
+    onToggle: (java.util.UUID) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        allTasks.forEach { task ->
+            val selected = task.id in selectedIds
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .background(
+                        if (selected) Color(0xFFE65100).copy(alpha = 0.1f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                    .clickable { onToggle(task.id) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    if (selected) Icons.Filled.Lock else Icons.Filled.Lock,
+                    contentDescription = null,
+                    tint = if (selected) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    task.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (selected) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        if (allTasks.isEmpty()) {
+            Text(
+                "No other tasks to block on yet.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
 
 @Composable
 private fun SectionLabel(text: String) {

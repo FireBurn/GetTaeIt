@@ -36,7 +36,14 @@ data class RecurrenceConfig(
     val daysOfWeek: List<Int> = emptyList(),      // for CUSTOM_DAYS; Calendar.MONDAY etc.
     val missedBehaviour: MissedBehaviour = MissedBehaviour.IGNORABLE,
     /** Preferred time of day (minutes since midnight), e.g. 480 = 08:00 */
-    val preferredTimeOfDayMinutes: Int? = null
+    val preferredTimeOfDayMinutes: Int? = null,
+    /**
+     * How many times per day to remind. Default 1.
+     * e.g. 2 = morning + evening, 4 = morning/lunch/evening/bedtime.
+     * Alarms are spread evenly across waking hours (07:00–22:00).
+     * Each instance is IGNORABLE — miss it and it's gone until the next slot.
+     */
+    val timesPerDay: Int = 1
 )
 
 // ─── Task Entity ──────────────────────────────────────────────────────────────
@@ -80,6 +87,12 @@ data class TaskEntity(
     // Meal-prep backwards scheduling
     val offsetReferenceId: UUID? = null,
     val offsetDuration: Long? = null,            // ms before (negative) or after the reference
+
+    // Time estimation
+    /** AI/template estimate of how long this task takes (minutes). Null = unknown. */
+    val estimatedMinutes: Int? = null,
+    /** Actual time recorded by user on completion (minutes). Used to improve future estimates. */
+    val actualMinutes: Int? = null,
 
     // Gamification
     val xpValue: Int = 10,

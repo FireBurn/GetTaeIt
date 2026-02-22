@@ -2,6 +2,7 @@ package uk.co.fireburn.gettaeit.shared.data
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import uk.co.fireburn.gettaeit.shared.domain.AppMode
 import uk.co.fireburn.gettaeit.shared.domain.ContextManager
 import uk.co.fireburn.gettaeit.shared.domain.RecurrenceEngine
@@ -36,6 +37,13 @@ class TaskRepositoryImpl @Inject constructor(
             contextManager.appMode
         ) { tasks, mode ->
             tasks.filter { it.parentId == null }.filterByMode(mode).sortedByDisplayOrder()
+        }
+    }
+
+    override fun getAllActiveToplevelTasks(): Flow<List<TaskEntity>> {
+        val now = System.currentTimeMillis()
+        return taskDao.getActiveTasks(now).map { tasks ->
+            tasks.filter { it.parentId == null }.sortedByDisplayOrder()
         }
     }
 
@@ -92,6 +100,18 @@ class TaskRepositoryImpl @Inject constructor(
 
     override suspend fun snoozeTask(task: TaskEntity, untilMs: Long) {
         taskDao.update(task.copy(isSnoozed = true, snoozedUntil = untilMs))
+    }
+
+    override suspend fun autoCompleteParentIfDone(parentId: UUID) {
+        val subtasks = taskDao.getSubtasksSync(parentId)
+        // If there are subtasks and all are completed, complete the parent
+        if (subtasks.isNotEmpty() && subtasks.all { it.isCompleted }) {
+            getTaskById(parentId)?.let { parent ->
+                if (!parent.isCompleted) {
+                    completeTask(parent)
+                }
+            }
+        }
     }
 
     // ─── Recurrence reset (called by WorkManager) ───────────────────────────
