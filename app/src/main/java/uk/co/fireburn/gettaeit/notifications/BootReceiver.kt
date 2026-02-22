@@ -22,6 +22,7 @@ class BootReceiver : BroadcastReceiver() {
 
     @Inject
     lateinit var taskRepository: TaskRepository
+
     @Inject
     lateinit var reminderScheduler: ReminderScheduler
 

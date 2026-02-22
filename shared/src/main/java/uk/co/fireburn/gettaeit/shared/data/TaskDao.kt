@@ -49,11 +49,16 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE parentId = :parentId ORDER BY priority ASC")
     fun getSubtasks(parentId: UUID): Flow<List<TaskEntity>>
 
-    @Query("SELECT * FROM tasks WHERE parentId = :parentId ORDER BY priority ASC")
-    suspend fun getSubtasksSync(parentId: UUID): List<TaskEntity>
-
     @Query("SELECT * FROM tasks WHERE parentId IS NULL ORDER BY priority ASC, dueDate ASC")
     fun getTopLevelTasks(): Flow<List<TaskEntity>>
+
+    /** All top-level tasks including completed, for dependency picker. */
+    @Query("SELECT * FROM tasks WHERE parentId IS NULL AND isCompleted = 0 ORDER BY title ASC")
+    fun getAllActiveToplevelTasks(): Flow<List<TaskEntity>>
+
+    /** Get all subtasks for a parent to check if all complete. */
+    @Query("SELECT * FROM tasks WHERE parentId = :parentId")
+    suspend fun getAllSubtasks(parentId: UUID): List<TaskEntity>
 
     // ── Write ────────────────────────────────────────────────────────────────
 

@@ -1,19 +1,13 @@
 package uk.co.fireburn.gettaeit.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,7 +23,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
@@ -63,7 +57,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -77,7 +70,6 @@ import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 import uk.co.fireburn.gettaeit.shared.domain.AppMode
 import uk.co.fireburn.gettaeit.shared.domain.RecurrenceEngine
 
-// ─── Accent colours ───────────────────────────────────────────────────────────
 private val WorkPrimary = Color(0xFF0065BD)
 private val PersonalPrimary = Color(0xFF8D5CA5)
 
@@ -90,35 +82,45 @@ fun TaskListScreen(
 ) {
     val tasks by viewModel.tasks.collectAsState()
     val appMode by viewModel.appMode.collectAsState()
+    val allTasks by viewModel.allTasks.collectAsState()
+
+    // Build a map of id -> how many tasks depend on each task (for "unblocks N" badge)
+    val unblocksCount = remember(allTasks) {
+        val map = mutableMapOf<java.util.UUID, Int>()
+        allTasks.forEach { t ->
+            t.dependencyIds.forEach { depId ->
+                map[depId] = (map[depId] ?: 0) + 1
+            }
+        }
+        map
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         ContextBanner(mode = appMode)
-
         if (tasks.isEmpty()) {
             EmptyState(mode = appMode)
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(tasks, key = { it.id }) { task ->
-                    TaskCard(
+                    TaskGroup(
                         task = task,
                         recurrenceEngine = recurrenceEngine,
-                        onComplete = { viewModel.completeTask(task) },
-                        onCompleteWithTime = { mins -> viewModel.completeTaskWithTime(task, mins) },
-                        onSnooze = { viewModel.snoozeTask(task) },
-                        onSnoozeTomorrow = { viewModel.snoozeTomorrow(task) },
-                        onDelete = { viewModel.deleteTask(task) },
-                        getSubtasks = { viewModel.getSubtasks(task.id) },
-                        onCompleteSubtask = { sub -> viewModel.completeTask(sub) },
+                        unblocksCount = unblocksCount[task.id] ?: 0,
+                        allTasks = allTasks,
+                        onCompleteSubtask = { sub -> viewModel.completeSubtask(sub) },
                         onCompleteSubtaskWithTime = { sub, mins ->
                             viewModel.completeTaskWithTime(
                                 sub,
                                 mins
                             )
-                        }
+                        },
+                        onSnooze = { viewModel.snoozeTask(task) },
+                        onSnoozeTomorrow = { viewModel.snoozeTomorrow(task) },
+                        onDelete = { viewModel.deleteTask(task) }
                     )
                 }
                 item { Spacer(Modifier.height(96.dp)) }
@@ -127,7 +129,7 @@ fun TaskListScreen(
     }
 }
 
-// ─── Context banner — uses MaterialTheme so it works in dark mode ─────────────
+// ─── Context banner ───────────────────────────────────────────────────────────
 
 @Composable
 private fun ContextBanner(mode: AppMode) {
@@ -147,8 +149,7 @@ private fun ContextBanner(mode: AppMode) {
             Color(0xFFE65100)
         )
     }
-
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant, tonalElevation = 0.dp) {
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -177,8 +178,7 @@ private fun ContextBanner(mode: AppMode) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    sub,
-                    style = MaterialTheme.typography.labelSmall,
+                    sub, style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
@@ -186,36 +186,119 @@ private fun ContextBanner(mode: AppMode) {
     }
 }
 
-// ─── Task card ────────────────────────────────────────────────────────────────
+// ─── Task group: subtask cards stacked, parent footer beneath ────────────────
+//
+// Layout:
+//   ┌─────────────────────────────────┐
+//   │  Subtask 1            5m    [ ] │  ← individual subtask card
+//   ├─────────────────────────────────┤
+//   │  Subtask 2           10m    [ ] │
+//   ├─────────────────────────────────┤
+//   │  ▏ Parent task title            │  ← parent footer (accent left border)
+//   │  ▏ Daily  ·  🔑 Unblocks 2     │
+//   └─────────────────────────────────┘
+//
+// If no subtasks, just the parent card is shown (slightly taller).
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskCard(
+fun TaskGroup(
     task: TaskEntity,
     recurrenceEngine: RecurrenceEngine,
-    onComplete: () -> Unit,
-    onCompleteWithTime: (Int?) -> Unit,
+    unblocksCount: Int,
+    allTasks: List<TaskEntity>,
+    onCompleteSubtask: (TaskEntity) -> Unit,
+    onCompleteSubtaskWithTime: (TaskEntity, Int?) -> Unit,
+    onSnooze: () -> Unit,
+    onSnoozeTomorrow: () -> Unit,
+    onDelete: () -> Unit
+) {
+
+    // This composable is called from TaskListScreen which has viewModel access,
+    // so we delegate via a stateful inner composable pattern.
+    // See TaskGroupStateful below.
+    TaskGroupStateful(
+        task = task,
+        recurrenceEngine = recurrenceEngine,
+        unblocksCount = unblocksCount,
+        allTasks = allTasks,
+        onCompleteSubtask = onCompleteSubtask,
+        onCompleteSubtaskWithTime = onCompleteSubtaskWithTime,
+        onSnooze = onSnooze,
+        onSnoozeTomorrow = onSnoozeTomorrow,
+        onDelete = onDelete
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TaskGroupStateful(
+    task: TaskEntity,
+    recurrenceEngine: RecurrenceEngine,
+    unblocksCount: Int,
+    allTasks: List<TaskEntity>,
+    onCompleteSubtask: (TaskEntity) -> Unit,
+    onCompleteSubtaskWithTime: (TaskEntity, Int?) -> Unit,
     onSnooze: () -> Unit,
     onSnoozeTomorrow: () -> Unit,
     onDelete: () -> Unit,
-    getSubtasks: () -> kotlinx.coroutines.flow.StateFlow<List<TaskEntity>>,
-    onCompleteSubtask: (TaskEntity) -> Unit,
-    onCompleteSubtaskWithTime: (TaskEntity, Int?) -> Unit
+    viewModel: MainViewModel = hiltViewModel()
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
-    var showTimeDlg by remember { mutableStateOf(false) }
-    val subtasks by getSubtasks().collectAsState()
+    val subtasks by viewModel.getSubtasks(task.id).collectAsState()
+    val accent = if (task.context == TaskContext.WORK) WorkPrimary else PersonalPrimary
 
-    val accentColor = if (task.context == TaskContext.WORK) WorkPrimary else PersonalPrimary
-    val hasSubtasks = subtasks.isNotEmpty()
-    val blockedCount = task.dependencyIds.size
+    // Check if this task is blocked (any dependency not yet complete)
+    val blockers =
+        task.dependencyIds.mapNotNull { depId -> allTasks.firstOrNull { it.id == depId } }
+    val isBlocked = blockers.any { !it.isCompleted }
+
     val doneCount = subtasks.count { it.isCompleted }
-    val arrowAngle by animateFloatAsState(if (expanded) 180f else 0f, label = "arrow")
+    val totalCount = subtasks.size
+
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+
+        // ── Subtask cards (shown first, most prominent) ────────────────────
+        subtasks.forEach { sub ->
+            SubtaskCard(
+                subtask = sub,
+                accent = accent,
+                onComplete = { onCompleteSubtask(sub) },
+                onCompleteWithTime = { mins -> onCompleteSubtaskWithTime(sub, mins) }
+            )
+        }
+
+        // ── Parent footer card ─────────────────────────────────────────────
+        ParentFooterCard(
+            task = task,
+            accent = accent,
+            recurrenceEngine = recurrenceEngine,
+            unblocksCount = unblocksCount,
+            blockers = blockers,
+            isBlocked = isBlocked,
+            doneCount = doneCount,
+            totalCount = totalCount,
+            onSnooze = onSnooze,
+            onSnoozeTomorrow = onSnoozeTomorrow,
+            onDelete = onDelete
+        )
+    }
+}
+
+// ─── Individual subtask card ─────────────────────────────────────────────────
+
+@Composable
+private fun SubtaskCard(
+    subtask: TaskEntity,
+    accent: Color,
+    onComplete: () -> Unit,
+    onCompleteWithTime: (Int?) -> Unit
+) {
+    var showTimeDlg by remember { mutableStateOf(false) }
+    val done = subtask.isCompleted
 
     if (showTimeDlg) {
         CompletionTimeDialog(
-            estimatedMinutes = task.estimatedMinutes,
+            estimatedMinutes = subtask.estimatedMinutes,
             onConfirm = { mins -> onCompleteWithTime(mins); showTimeDlg = false },
             onSkip = { onComplete(); showTimeDlg = false },
             onDismiss = { showTimeDlg = false }
@@ -224,243 +307,255 @@ fun TaskCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = RoundedCornerShape(10.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (done)
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            else
+                MaterialTheme.colorScheme.surface
+        )
     ) {
-        Column {
-            Row(modifier = Modifier
+        Row(
+            modifier = Modifier
                 .fillMaxWidth()
-                .height(IntrinsicSize.Min)) {
-                // Accent strip — fillMaxHeight works because Row uses IntrinsicSize.Min
-                Box(
-                    modifier = Modifier
-                        .width(4.dp)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
-                        .background(accentColor)
-                )
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 12.dp, end = 4.dp, top = 12.dp, bottom = 12.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.Top) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = task.title,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            task.description?.let {
-                                Text(
-                                    text = it,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-
-                        // Complete button
-                        IconButton(
-                            onClick = {
-                                if (!task.isCompleted) {
-                                    if (task.estimatedMinutes != null) showTimeDlg = true
-                                    else onComplete()
-                                }
-                            },
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                if (task.isCompleted) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-                                contentDescription = "Complete",
-                                tint = if (task.isCompleted) accentColor
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-
-                    // Chips
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(top = 6.dp)
-                    ) {
-                        if (task.recurrence.type != RecurrenceType.NONE) {
-                            MetaChip(
-                                Icons.Filled.Repeat,
-                                recurrenceEngine.describeRecurrence(task.recurrence),
-                                accentColor
-                            )
-                        }
-                        if (task.priority <= 2) {
-                            MetaChip(Icons.Filled.PriorityHigh, "Urgent", Color(0xFFD32F2F))
-                        }
-                        task.estimatedMinutes?.let {
-                            MetaChip(Icons.Filled.Timer, formatMinutes(it), accentColor)
-                        }
-                        if (blockedCount > 0) {
-                            MetaChip(
-                                Icons.Filled.Lock,
-                                "Blocked by $blockedCount",
-                                Color(0xFFE65100)
-                            )
-                        }
-                        if (task.streakCount > 1) {
-                            MetaChip(
-                                Icons.Filled.LocalFireDepartment,
-                                "×${task.streakCount}",
-                                Color(0xFFFF6F00)
-                            )
-                        }
-                    }
-
-                    // Subtask progress bar + expand trigger
-                    if (hasSubtasks) {
-                        Spacer(Modifier.height(10.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { expanded = !expanded }
-                                .padding(vertical = 2.dp)
-                        ) {
-                            LinearProgressIndicator(
-                                progress = { if (subtasks.isEmpty()) 0f else doneCount.toFloat() / subtasks.size },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(3.dp)),
-                                color = accentColor,
-                                trackColor = accentColor.copy(alpha = 0.15f)
-                            )
-                            Text(
-                                "$doneCount/${subtasks.size}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = accentColor,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Icon(
-                                Icons.Filled.KeyboardArrowDown,
-                                contentDescription = if (expanded) "Collapse" else "Expand",
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .rotate(arrowAngle),
-                                tint = accentColor
-                            )
-                        }
-                    }
+                .clickable(enabled = !done) {
+                    if (subtask.estimatedMinutes != null) showTimeDlg = true
+                    else onComplete()
                 }
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Completion icon
+            Icon(
+                if (done) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
+                contentDescription = if (done) "Done" else "Complete",
+                tint = if (done) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp)
+            )
 
-                // ⋮ menu
-                Box {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(
-                            Icons.Filled.MoreVert, contentDescription = "Options",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Snooze 2 hours") },
-                            leadingIcon = { Icon(Icons.Filled.Snooze, null) },
-                            onClick = { onSnooze(); showMenu = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Snooze till tomorrow") },
-                            leadingIcon = { Icon(Icons.Filled.WbSunny, null) },
-                            onClick = { onSnoozeTomorrow(); showMenu = false }
-                        )
-                        if (task.recurrence.type == RecurrenceType.NONE) {
-                            DropdownMenuItem(
-                                text = { Text("Delete") },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Filled.Delete,
-                                        null,
-                                        tint = Color(0xFFD32F2F)
-                                    )
-                                },
-                                onClick = { onDelete(); showMenu = false }
-                            )
-                        }
-                    }
-                }
-            }
+            // Title
+            Text(
+                text = subtask.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (done) FontWeight.Normal else FontWeight.Medium,
+                textDecoration = if (done) TextDecoration.LineThrough else null,
+                color = if (done) MaterialTheme.colorScheme.onSurfaceVariant
+                else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
 
-            // Subtask list
-            AnimatedVisibility(
-                visible = expanded && hasSubtasks,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+            // Time estimate
+            subtask.estimatedMinutes?.let { mins ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    subtasks.forEach { sub ->
-                        SubtaskRow(
-                            subtask = sub,
-                            accent = accentColor,
-                            onComplete = { if (!sub.isCompleted) onCompleteSubtask(sub) }
-                        )
-                    }
+                    Icon(
+                        Icons.Filled.Timer, null,
+                        modifier = Modifier.size(11.dp),
+                        tint = accent.copy(alpha = if (done) 0.4f else 0.8f)
+                    )
+                    Text(
+                        formatMinutes(mins),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = accent.copy(alpha = if (done) 0.4f else 0.85f),
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
     }
 }
 
-// ─── Subtask row — prominent ──────────────────────────────────────────────────
+// ─── Parent footer card ──────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SubtaskRow(subtask: TaskEntity, accent: Color, onComplete: () -> Unit) {
-    val done = subtask.isCompleted
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(
-                if (done) accent.copy(alpha = 0.07f)
-                else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-            )
-            .clickable { if (!done) onComplete() }
-            .padding(horizontal = 10.dp, vertical = 8.dp)
+private fun ParentFooterCard(
+    task: TaskEntity,
+    accent: Color,
+    recurrenceEngine: RecurrenceEngine,
+    unblocksCount: Int,
+    blockers: List<TaskEntity>,
+    isBlocked: Boolean,
+    doneCount: Int,
+    totalCount: Int,
+    onSnooze: () -> Unit,
+    onSnoozeTomorrow: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(
+            topStart = if (totalCount > 0) 0.dp else 14.dp,
+            topEnd = if (totalCount > 0) 0.dp else 14.dp,
+            bottomStart = 14.dp,
+            bottomEnd = 14.dp
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isBlocked)
+                MaterialTheme.colorScheme.surfaceVariant
+            else
+                MaterialTheme.colorScheme.surface
+        )
     ) {
-        Icon(
-            if (done) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = if (done) accent else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = subtask.title,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (done) FontWeight.Normal else FontWeight.Medium,
-            textDecoration = if (done) TextDecoration.LineThrough else null,
-            color = if (done) MaterialTheme.colorScheme.onSurfaceVariant
-            else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
-        subtask.estimatedMinutes?.let {
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = formatMinutes(it),
-                style = MaterialTheme.typography.labelSmall,
-                color = accent.copy(alpha = if (done) 0.4f else 0.85f),
-                fontWeight = FontWeight.SemiBold
+        Row(modifier = Modifier.fillMaxWidth()) {
+            // Left accent bar
+            Box(
+                modifier = Modifier
+                    .width(5.dp)
+                    .height(if (totalCount > 0) 64.dp else 72.dp)
+                    .background(
+                        if (isBlocked) accent.copy(alpha = 0.3f) else accent,
+                        RoundedCornerShape(bottomStart = 14.dp)
+                    )
             )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = task.title,
+                        style = if (totalCount > 0) MaterialTheme.typography.bodyMedium
+                        else MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isBlocked) MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                // Progress if has subtasks
+                if (totalCount > 0) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        LinearProgressIndicator(
+                            progress = { doneCount.toFloat() / totalCount },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            color = accent,
+                            trackColor = accent.copy(alpha = 0.15f)
+                        )
+                        Text(
+                            "$doneCount/$totalCount",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = accent,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                // Meta chips row
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (task.recurrence.type != RecurrenceType.NONE) {
+                        MetaChip(
+                            Icons.Filled.Repeat,
+                            recurrenceEngine.describeRecurrence(task.recurrence), accent
+                        )
+                    }
+                    if (task.priority <= 2) {
+                        MetaChip(Icons.Filled.PriorityHigh, "Urgent", Color(0xFFD32F2F))
+                    }
+                    task.estimatedMinutes?.let { mins ->
+                        if (totalCount == 0) MetaChip(
+                            Icons.Filled.Timer,
+                            formatMinutes(mins),
+                            accent
+                        )
+                    }
+                    // 🔑 Unblocks badge — shows if other tasks depend on this one
+                    if (unblocksCount > 0) {
+                        MetaChip(
+                            Icons.Filled.Key,
+                            "Unblocks $unblocksCount",
+                            Color(0xFF2E7D32)
+                        )
+                    }
+                    // 🔒 Blocked badge — shows what's blocking this
+                    if (isBlocked) {
+                        MetaChip(
+                            Icons.Filled.Lock,
+                            "Blocked by ${blockers.count { !it.isCompleted }}",
+                            Color(0xFFE65100)
+                        )
+                    }
+                    if (task.streakCount > 1) {
+                        MetaChip(
+                            Icons.Filled.LocalFireDepartment,
+                            "×${task.streakCount}",
+                            Color(0xFFFF6F00)
+                        )
+                    }
+                }
+
+                // Blocker names (collapsed to one line if long)
+                if (isBlocked) {
+                    val blockerNames =
+                        blockers.filter { !it.isCompleted }.joinToString(" · ") { it.title }
+                    Text(
+                        "Waiting on: $blockerNames",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFE65100).copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            // ⋮ menu
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(
+                        Icons.Filled.MoreVert, "Options",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Snooze 2 hours") },
+                        leadingIcon = { Icon(Icons.Filled.Snooze, null) },
+                        onClick = { onSnooze(); showMenu = false }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Snooze till tomorrow") },
+                        leadingIcon = { Icon(Icons.Filled.WbSunny, null) },
+                        onClick = { onSnoozeTomorrow(); showMenu = false }
+                    )
+                    if (task.recurrence.type == RecurrenceType.NONE) {
+                        DropdownMenuItem(
+                            text = { Text("Delete") },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Filled.Delete,
+                                    null,
+                                    tint = Color(0xFFD32F2F)
+                                )
+                            },
+                            onClick = { onDelete(); showMenu = false }
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -468,14 +563,13 @@ private fun SubtaskRow(subtask: TaskEntity, accent: Color, onComplete: () -> Uni
 // ─── Completion time dialog ───────────────────────────────────────────────────
 
 @Composable
-private fun CompletionTimeDialog(
+fun CompletionTimeDialog(
     estimatedMinutes: Int?,
     onConfirm: (Int?) -> Unit,
     onSkip: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var input by remember { mutableStateOf(estimatedMinutes?.toString() ?: "") }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("How long did that take? ⏱️") },
@@ -483,7 +577,7 @@ private fun CompletionTimeDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (estimatedMinutes != null) {
                     Text(
-                        "We guessed ${formatMinutes(estimatedMinutes)}. Help us get better!",
+                        "Guessed ${formatMinutes(estimatedMinutes)}. Help us get better!",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -499,12 +593,8 @@ private fun CompletionTimeDialog(
                 )
             }
         },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(input.toIntOrNull()) }) { Text("Save") }
-        },
-        dismissButton = {
-            TextButton(onClick = onSkip) { Text("Skip") }
-        }
+        confirmButton = { TextButton(onClick = { onConfirm(input.toIntOrNull()) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onSkip) { Text("Skip") } }
     )
 }
 
@@ -514,19 +604,17 @@ private fun CompletionTimeDialog(
 private fun MetaChip(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    tint: Color,
-    onClick: (() -> Unit)? = null
+    tint: Color
 ) {
-    val mod = if (onClick != null) Modifier.clickable { onClick() } else Modifier
     Row(
-        modifier = mod
+        modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
             .background(tint.copy(alpha = 0.1f))
             .padding(horizontal = 6.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(10.dp), tint = tint)
+        Icon(icon, null, modifier = Modifier.size(10.dp), tint = tint)
         Text(label, style = MaterialTheme.typography.labelSmall, color = tint)
     }
 }
@@ -540,9 +628,11 @@ fun EmptyState(mode: AppMode = AppMode.PERSONAL) {
         AppMode.PERSONAL -> Triple("🛋️", "Nae bother!", "Chill oot. Yer list is empty.")
         AppMode.COMMUTE -> Triple("🚗", "Safe travels!", "Nothing urgent for the road.")
     }
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .padding(32.dp), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp), contentAlignment = Alignment.Center
+    ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -554,8 +644,7 @@ fun EmptyState(mode: AppMode = AppMode.PERSONAL) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                body,
-                style = MaterialTheme.typography.bodyMedium,
+                body, style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -564,7 +653,7 @@ fun EmptyState(mode: AppMode = AppMode.PERSONAL) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-private fun formatMinutes(minutes: Int): String = when {
+fun formatMinutes(minutes: Int): String = when {
     minutes < 60 -> "${minutes}m"
     minutes % 60 == 0 -> "${minutes / 60}h"
     else -> "${minutes / 60}h ${minutes % 60}m"

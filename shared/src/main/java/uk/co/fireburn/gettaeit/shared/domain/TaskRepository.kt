@@ -8,11 +8,14 @@ interface TaskRepository {
     /** All active tasks for the current Work/Personal mode, filtered and sorted. */
     fun getTasksForCurrentMode(): Flow<List<TaskEntity>>
 
-    /** Top-level tasks only (no subtasks). */
+    /** Top-level tasks only (no subtasks), filtered by current mode. */
     fun getTopLevelTasksForCurrentMode(): Flow<List<TaskEntity>>
 
-    /** All active top-level tasks, regardless of mode (for Alarms/Widgets). */
+    /** All active top-level tasks regardless of mode (for dependency picker). */
     fun getAllActiveToplevelTasks(): Flow<List<TaskEntity>>
+
+    /** Check all subtasks and auto-complete parent if all done. */
+    suspend fun autoCompleteParentIfDone(parentId: UUID)
 
     /** Subtasks belonging to a given parent. */
     fun getSubtasks(parentId: UUID): Flow<List<TaskEntity>>
@@ -39,9 +42,6 @@ interface TaskRepository {
 
     suspend fun updateTask(task: TaskEntity)
     suspend fun deleteTask(task: TaskEntity)
-
-    /** Check if all subtasks are done, and if so, mark the parent as done. */
-    suspend fun autoCompleteParentIfDone(parentId: UUID)
 
     /** Reset any recurring tasks whose nextOccurrenceAt has passed. Called by WorkManager. */
     suspend fun resetDueRecurrences()

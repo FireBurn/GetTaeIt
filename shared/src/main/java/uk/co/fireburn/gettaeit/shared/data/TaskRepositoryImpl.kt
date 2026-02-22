@@ -2,7 +2,6 @@ package uk.co.fireburn.gettaeit.shared.data
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import uk.co.fireburn.gettaeit.shared.domain.AppMode
 import uk.co.fireburn.gettaeit.shared.domain.ContextManager
 import uk.co.fireburn.gettaeit.shared.domain.RecurrenceEngine
@@ -40,15 +39,19 @@ class TaskRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun getAllActiveToplevelTasks(): Flow<List<TaskEntity>> {
-        val now = System.currentTimeMillis()
-        return taskDao.getActiveTasks(now).map { tasks ->
-            tasks.filter { it.parentId == null }.sortedByDisplayOrder()
-        }
-    }
-
     override fun getSubtasks(parentId: UUID): Flow<List<TaskEntity>> =
         taskDao.getSubtasks(parentId)
+
+    override fun getAllActiveToplevelTasks(): Flow<List<TaskEntity>> =
+        taskDao.getAllActiveToplevelTasks()
+
+    override suspend fun autoCompleteParentIfDone(parentId: UUID) {
+        val subtasks = taskDao.getAllSubtasks(parentId)
+        if (subtasks.isNotEmpty() && subtasks.all { it.isCompleted }) {
+            val parent = taskDao.getTaskById(parentId) ?: return
+            if (!parent.isCompleted) completeTask(parent)
+        }
+    }
 
     // ─── Single task ────────────────────────────────────────────────────────
 
@@ -102,18 +105,6 @@ class TaskRepositoryImpl @Inject constructor(
         taskDao.update(task.copy(isSnoozed = true, snoozedUntil = untilMs))
     }
 
-    override suspend fun autoCompleteParentIfDone(parentId: UUID) {
-        val subtasks = taskDao.getSubtasksSync(parentId)
-        // If there are subtasks and all are completed, complete the parent
-        if (subtasks.isNotEmpty() && subtasks.all { it.isCompleted }) {
-            getTaskById(parentId)?.let { parent ->
-                if (!parent.isCompleted) {
-                    completeTask(parent)
-                }
-            }
-        }
-    }
-
     // ─── Recurrence reset (called by WorkManager) ───────────────────────────
 
     override suspend fun resetDueRecurrences() {
@@ -134,13 +125,60 @@ class TaskRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun List<TaskEntity>.sortedByDisplayOrder(): List<TaskEntity> = sortedWith(
-        compareBy(
-            { it.priority },      // 1 = most urgent
-            { it.dueDate ?: Long.MAX_VALUE },
-            { it.title }
-        )
-    )
+    /**
+     * Smart sort order:
+     * 1. Blocked tasks (have unfulfilled dependencies) sink — you can't do them anyway
+     * 2. High-dependency-count tasks float up (unblocking them unlocks others)
+     * 3. Tasks recently completed on a recurring schedule sink (not due for a while)
+     * 4. Within same urgency: quick tasks (low estimatedMinutes) first
+     * 5. Fallback: explicit priority, then due date
+     */
+    private fun List<TaskEntity>.sortedByDisplayOrder(): List<TaskEntity> {
+        map { it.id }.toSet()
+        // Count how many tasks each task blocks (i.e. how many others depend on it)
+        val unblocksCount = mutableMapOf<UUID, Int>()
+        forEach { task ->
+            task.dependencyIds.forEach { depId ->
+                unblocksCount[depId] = (unblocksCount[depId] ?: 0) + 1
+            }
+        }
+        val now = System.currentTimeMillis()
+
+        return sortedWith(
+            compareBy(
+                // 1. Blocked tasks last (dependencies not yet complete)
+                { task ->
+                    val hasUnmetDeps = task.dependencyIds.any { depId ->
+                        val dep = firstOrNull { it.id == depId }
+                        dep != null && !dep.isCompleted
+                    }
+                    if (hasUnmetDeps) 1 else 0
+                },
+                // 2. Tasks that unblock many others float up (negate to sort descending)
+                { task -> -(unblocksCount[task.id] ?: 0) },
+                // 3. Recently-completed recurring tasks sink — next occurrence is far away
+                { task ->
+                    val nextOcc = task.nextOccurrenceAt
+                    if (nextOcc != null && nextOcc > now) {
+                        // How far in the future is the next occurrence? Bucket it.
+                        val hoursAway = (nextOcc - now) / 3_600_000L
+                        when {
+                            hoursAway > 24 * 7 -> 3   // weekly+ away: sink far
+                            hoursAway > 24 -> 2   // tomorrow-ish
+                            else -> 1   // later today
+                        }
+                    } else 0
+                },
+                // 4. Explicit priority (1=urgent, 5=someday)
+                { task -> task.priority },
+                // 5. Due date urgency
+                { task -> task.dueDate ?: Long.MAX_VALUE },
+                // 6. Quick wins first (shorter estimated time = float up)
+                { task -> task.estimatedMinutes ?: Int.MAX_VALUE },
+                // 7. Alpha tiebreak
+                { task -> task.title }
+            ))
+    }
 
     private fun calculateStreak(task: TaskEntity, now: Long): Int {
         val oneDayMs = 86_400_000L
