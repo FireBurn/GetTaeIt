@@ -19,6 +19,8 @@ room = "2.7.0"
 datastorePreferences = "1.1.2"
 carApp = "1.7.0"
 wearCompose = "1.5.0"
+wearTiles = "1.4.1"
+wearInput = "1.2.0"
 
 # Compose
 composeBom = "2026.01.00"
@@ -71,6 +73,7 @@ gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutines" }
+kotlinx-coroutines-guava = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-guava", version.ref = "coroutines" }
 
 # Firebase
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
@@ -88,6 +91,9 @@ play-services-wearable = { group = "com.google.android.gms", name = "play-servic
 androidx-car-app = { group = "androidx.car.app", name = "app", version.ref = "carApp" }
 androidx-wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wearCompose" }
 androidx-wear-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "wearCompose" }
+androidx-wear-tiles = { group = "androidx.wear.tiles", name = "tiles", version.ref = "wearTiles" }
+androidx-wear-tiles-material = { group = "androidx.wear.tiles", name = "tiles-material", version.ref = "wearTiles" }
+androidx-wear-input = { group = "androidx.wear", name = "wear-input", version.ref = "wearInput" }
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 maps-compose = { group = "com.google.maps.android", name = "maps-compose", version.ref = "mapsCompose" }
 

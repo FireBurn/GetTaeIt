@@ -63,22 +63,32 @@ fun AddTaskScreen(
     val state by viewModel.addTaskState.collectAsState()
     val allTasks by viewModel.allTasks.collectAsState()
     val scrollState = rememberScrollState()
+    val editingTaskId by viewModel.editingTaskId.collectAsState()
+    val isEditing = editingTaskId != null
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("New Task", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        if (isEditing) "Edit Task" else "New Task",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.resetAddTaskState(); onTaskAdded() }) {
+                    IconButton(onClick = { viewModel.cancelEdit(); onTaskAdded() }) {
                         Icon(Icons.Filled.Close, "Cancel")
                     }
                 },
                 actions = {
                     Button(
-                        onClick = { viewModel.saveTask(); onTaskAdded() },
+                        onClick = {
+                            if (isEditing) viewModel.saveTaskEdits() else viewModel.saveTask()
+                            onTaskAdded()
+                        },
                         enabled = state.title.isNotBlank(),
                         modifier = Modifier.padding(end = 8.dp)
-                    ) { Text("Save") }
+                    ) { Text(if (isEditing) "Update" else "Save") }
                 }
             )
         }

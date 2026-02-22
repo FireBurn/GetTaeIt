@@ -53,19 +53,19 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.play.services.wearable)
 
-    // Wear Core
-    implementation("androidx.percentlayout:percentlayout:1.0.0")
-    implementation("androidx.legacy:legacy-support-v4:1.0.0")
-    implementation("androidx.recyclerview:recyclerview:1.3.2")
-    implementation("androidx.wear:wear:1.3.0")
-
-    // Compose for Wear OS
+    // Wear OS Compose — use the new foundation.lazy package
     implementation(platform(libs.androidx.compose.bom))
-
     implementation(libs.androidx.wear.compose.material)
     implementation(libs.androidx.wear.compose.foundation)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material.icons.extended)
+
+    // Wear Tiles
+    implementation(libs.androidx.wear.tiles)
+    implementation(libs.androidx.wear.tiles.material)
+
+    // Wear Input (RemoteInputHelper for voice on watch)
+    implementation(libs.androidx.wear.input)
 
     // Hilt
     implementation(libs.hilt.android)
@@ -74,4 +74,6 @@ dependencies {
 
     // Lifecycle
     implementation(libs.androidx.lifecycle.runtime.ktx)
+
+    // Coroutines Guava bridge (needed by TileService.future{})
 }

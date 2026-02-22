@@ -22,6 +22,12 @@ interface TaskRepository {
 
     suspend fun getTaskById(id: UUID): TaskEntity?
 
+    /**
+     * Returns historical completed tasks whose title matches [title] closely.
+     * Used by the learning loop to improve time estimates.
+     */
+    suspend fun getCompletedByTitle(title: String): List<TaskEntity>
+
     /** Add a task. If it has subtasks they must be added separately via addAll. */
     suspend fun addTask(task: TaskEntity)
     suspend fun addAll(tasks: List<TaskEntity>)

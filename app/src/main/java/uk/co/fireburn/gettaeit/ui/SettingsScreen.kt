@@ -26,10 +26,12 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -46,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -55,7 +58,24 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val scrollState = rememberScrollState()
 
     var workSsidInput by remember(prefs.workSsid) { mutableStateOf(prefs.workSsid ?: "") }
-    var showLocationInfo by remember { mutableStateOf(false) }
+
+    // Work hours state
+    var startHour by remember(prefs.workSchedule.startHour) {
+        mutableStateOf(prefs.workSchedule.startHour.toFloat())
+    }
+    var endHour by remember(prefs.workSchedule.endHour) {
+        mutableStateOf(prefs.workSchedule.endHour.toFloat())
+    }
+
+    val dayLabels = listOf(
+        Calendar.MONDAY to "Mon",
+        Calendar.TUESDAY to "Tue",
+        Calendar.WEDNESDAY to "Wed",
+        Calendar.THURSDAY to "Thu",
+        Calendar.FRIDAY to "Fri",
+        Calendar.SATURDAY to "Sat",
+        Calendar.SUNDAY to "Sun"
+    )
 
     val locationPermissions = rememberMultiplePermissionsState(
         permissions = buildList {
@@ -83,32 +103,56 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         // ── Work schedule ────────────────────────────────────────────────────
         SettingsCard(title = "⏰ Work Hours", subtitle = "When should Work Mode kick in?") {
             val sched = prefs.workSchedule
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "${sched.startHour}:00",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text("until", style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    "${sched.endHour}:00",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "Mon–Fri", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+
             Text(
-                "Full schedule editing coming soon 🔧",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                "Start: ${startHour.toInt()}:00 → End: ${endHour.toInt()}:00",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
             )
+
+            Text("Start hour", style = MaterialTheme.typography.labelSmall)
+            Slider(
+                value = startHour,
+                onValueChange = { startHour = it },
+                onValueChangeFinished = {
+                    viewModel.setWorkHours(startHour.toInt(), endHour.toInt())
+                },
+                valueRange = 0f..23f,
+                steps = 22
+            )
+
+            Text("End hour", style = MaterialTheme.typography.labelSmall)
+            Slider(
+                value = endHour,
+                onValueChange = { if (it > startHour) endHour = it },
+                onValueChangeFinished = {
+                    viewModel.setWorkHours(startHour.toInt(), endHour.toInt())
+                },
+                valueRange = 0f..23f,
+                steps = 22
+            )
+
+            Text("Working days", style = MaterialTheme.typography.labelSmall)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                dayLabels.forEach { (calDay, label) ->
+                    val selected = sched.workingDays.contains(calDay)
+                    FilterChip(
+                        selected = selected,
+                        onClick = {
+                            val newDays = if (selected)
+                                sched.workingDays - calDay
+                            else
+                                sched.workingDays + calDay
+                            viewModel.setWorkingDays(newDays.sorted())
+                        },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
         }
 
         // ── Work location ────────────────────────────────────────────────────
@@ -132,7 +176,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 }
             } else {
                 Text(
-                    "No work location set.", style = MaterialTheme.typography.bodySmall,
+                    "No work location set.",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -142,10 +187,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             Button(
                 onClick = {
                     when {
-                        locationPermissions.allPermissionsGranted -> {
-                            // TODO: open a map picker or use current GPS location
-                            showLocationInfo = true
-                        }
+                        locationPermissions.allPermissionsGranted ->
+                            viewModel.captureCurrentLocationAsWork()
 
                         else -> locationPermissions.launchMultiplePermissionRequest()
                     }
@@ -154,12 +197,17 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             ) {
                 Icon(Icons.Filled.MyLocation, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(if (prefs.workLocationString == null) "Use Current Location as Work" else "Update Work Location")
+                Text(
+                    if (prefs.workLocationString == null)
+                        "Use Current Location as Work"
+                    else
+                        "Update Work Location"
+                )
             }
 
-            if (showLocationInfo) {
+            if (!locationPermissions.allPermissionsGranted) {
                 Text(
-                    "📍 GPS location capture will be added in the next build. For now, set your work WiFi SSID below as an alternative.",
+                    "📍 Grant location permission to enable auto work-mode switching.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary
                 )
@@ -187,10 +235,16 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             )
             if (prefs.workSsid != null) {
                 Text(
-                    "Active: \"${prefs.workSsid}\"", style = MaterialTheme.typography.bodySmall,
+                    "Active: \"${prefs.workSsid}\"",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+            Text(
+                "Note: on Android 8+, SSID detection requires Location permission to be granted.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         // ── Permissions summary ──────────────────────────────────────────────
@@ -219,9 +273,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 Spacer(Modifier.height(4.dp))
                 OutlinedButton(
                     onClick = {
-                        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package", context.packageName, null)
-                        })
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                        )
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Open App Settings") }
@@ -231,7 +287,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         // ── About ────────────────────────────────────────────────────────────
         SettingsCard(title = "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Get Tae It", subtitle = null) {
             Text(
-                "Version 1.0.0 · fireburn.co.uk", style = MaterialTheme.typography.bodySmall,
+                "Version 1.0.0 · fireburn.co.uk",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(

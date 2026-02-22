@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -113,14 +114,15 @@ fun TaskListScreen(
                         allTasks = allTasks,
                         onCompleteSubtask = { sub -> viewModel.completeSubtask(sub) },
                         onCompleteSubtaskWithTime = { sub, mins ->
-                            viewModel.completeTaskWithTime(
-                                sub,
-                                mins
-                            )
+                            viewModel.completeTaskWithTime(sub, mins)
                         },
                         onSnooze = { viewModel.snoozeTask(task) },
                         onSnoozeTomorrow = { viewModel.snoozeTomorrow(task) },
-                        onDelete = { viewModel.deleteTask(task) }
+                        onDelete = { viewModel.deleteTask(task) },
+                        onEdit = {
+                            viewModel.loadTaskForEditing(task)
+                            onAddTaskClicked() // navigate to the Add/Edit screen
+                        }
                     )
                 }
                 item { Spacer(Modifier.height(96.dp)) }
@@ -211,12 +213,9 @@ fun TaskGroup(
     onCompleteSubtaskWithTime: (TaskEntity, Int?) -> Unit,
     onSnooze: () -> Unit,
     onSnoozeTomorrow: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEdit: () -> Unit = {}
 ) {
-
-    // This composable is called from TaskListScreen which has viewModel access,
-    // so we delegate via a stateful inner composable pattern.
-    // See TaskGroupStateful below.
     TaskGroupStateful(
         task = task,
         recurrenceEngine = recurrenceEngine,
@@ -226,7 +225,8 @@ fun TaskGroup(
         onCompleteSubtaskWithTime = onCompleteSubtaskWithTime,
         onSnooze = onSnooze,
         onSnoozeTomorrow = onSnoozeTomorrow,
-        onDelete = onDelete
+        onDelete = onDelete,
+        onEdit = onEdit
     )
 }
 
@@ -242,6 +242,7 @@ fun TaskGroupStateful(
     onSnooze: () -> Unit,
     onSnoozeTomorrow: () -> Unit,
     onDelete: () -> Unit,
+    onEdit: () -> Unit = {},
     viewModel: MainViewModel = hiltViewModel()
 ) {
     val subtasks by remember(task.id) {
@@ -282,7 +283,8 @@ fun TaskGroupStateful(
             totalCount = totalCount,
             onSnooze = onSnooze,
             onSnoozeTomorrow = onSnoozeTomorrow,
-            onDelete = onDelete
+            onDelete = onDelete,
+            onEdit = onEdit
         )
     }
 }
@@ -389,7 +391,8 @@ private fun ParentFooterCard(
     totalCount: Int,
     onSnooze: () -> Unit,
     onSnoozeTomorrow: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEdit: () -> Unit = {}
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -534,6 +537,11 @@ private fun ParentFooterCard(
                     )
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Edit task") },
+                        leadingIcon = { Icon(Icons.Filled.Edit, null) },
+                        onClick = { onEdit(); showMenu = false }
+                    )
                     DropdownMenuItem(
                         text = { Text("Snooze 2 hours") },
                         leadingIcon = { Icon(Icons.Filled.Snooze, null) },

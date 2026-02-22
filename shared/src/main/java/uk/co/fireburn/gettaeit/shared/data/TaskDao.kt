@@ -60,6 +60,13 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE parentId = :parentId")
     suspend fun getAllSubtasks(parentId: UUID): List<TaskEntity>
 
+    /**
+     * Completed tasks with a title matching [titlePattern] (SQLite LIKE).
+     * Used by the learning loop to improve future time estimates.
+     */
+    @Query("SELECT * FROM tasks WHERE isCompleted = 1 AND actualMinutes IS NOT NULL AND title LIKE :titlePattern ORDER BY completedAt DESC LIMIT 20")
+    suspend fun getCompletedByTitle(titlePattern: String): List<TaskEntity>
+
     // ── Write ────────────────────────────────────────────────────────────────
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

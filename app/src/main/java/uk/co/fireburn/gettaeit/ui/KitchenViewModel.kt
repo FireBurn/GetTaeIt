@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
+import uk.co.fireburn.gettaeit.shared.domain.scheduling.RecipeType
 import uk.co.fireburn.gettaeit.shared.domain.scheduling.SmartMealService
 import javax.inject.Inject
 
@@ -18,7 +19,8 @@ class KitchenViewModel @Inject constructor(
     fun scheduleMeal(
         title: String,
         description: String?,
-        timestamp: Long
+        timestamp: Long,
+        recipeType: RecipeType
     ) {
         viewModelScope.launch {
             val mainMealEvent = TaskEntity(
@@ -29,11 +31,10 @@ class KitchenViewModel @Inject constructor(
                 wifiTrigger = null,
                 offsetReferenceId = null,
                 offsetDuration = null
-                // Other fields will be set to defaults
             )
             taskRepository.addTask(mainMealEvent)
 
-            val prepTasks = smartMealService.generatePrepTasks(mainMealEvent)
+            val prepTasks = smartMealService.generatePrepTasks(mainMealEvent, recipeType)
             prepTasks.forEach { task ->
                 taskRepository.addTask(task)
             }

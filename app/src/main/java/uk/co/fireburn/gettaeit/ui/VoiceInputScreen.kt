@@ -34,11 +34,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +48,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +61,18 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import uk.co.fireburn.gettaeit.ui.theme.ThistlePurple
+import java.util.Calendar
+
+/**
+ * Quick scheduling option shown in the "When?" bottom sheet after voice recognition.
+ */
+private sealed class WhenOption(val label: String) {
+    object Now : WhenOption("Right now")
+    object ThisEvening : WhenOption("This evening (6pm)")
+    object Tomorrow : WhenOption("Tomorrow 9am")
+    object ThisWeek : WhenOption("This week")
+    object NoDate : WhenOption("No date")
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -72,6 +87,12 @@ fun VoiceInputScreen(
     var editableText by remember { mutableStateOf("") }
     var hasResult by remember { mutableStateOf(false) }
     val isParsing by viewModel.isParsingVoice.collectAsState()
+    rememberCoroutineScope()
+
+    // "When?" bottom sheet state
+    var showWhenSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var pendingVoiceText by remember { mutableStateOf("") }
 
     val speechRecognizer = remember { SpeechRecognizer.createSpeechRecognizer(context) }
     val recognizerIntent = remember {
@@ -115,8 +136,9 @@ fun VoiceInputScreen(
                     recognizedText = matches[0]
                     editableText = matches[0]
                     hasResult = true
-                    // Auto-trigger AI parsing
-                    viewModel.addTasksFromVoice(matches[0]) { onNavigateBack() }
+                    // Show "When?" sheet instead of immediately saving
+                    pendingVoiceText = matches[0]
+                    showWhenSheet = true
                 }
                 isListening = false
             }
@@ -136,23 +158,92 @@ fun VoiceInputScreen(
         onDispose { speechRecognizer.destroy() }
     }
 
-    // Auto-start recording when screen opens (if permission already granted)
     LaunchedEffect(permissionState.status.isGranted) {
-        if (permissionState.status.isGranted) {
-            startListening()
-        } else {
-            permissionState.launchPermissionRequest()
-        }
+        if (permissionState.status.isGranted) startListening()
+        else permissionState.launchPermissionRequest()
     }
 
-    // Pulsing animation for the mic icon while listening
     val infiniteTransition = rememberInfiniteTransition(label = "mic_pulse")
     val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(tween(700)),
-        label = "scale"
+        initialValue = 1f, targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(tween(700)), label = "scale"
     )
+
+    // "When?" bottom sheet
+    if (showWhenSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showWhenSheet = false },
+            sheetState = sheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .padding(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "When do you want to do it?",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    "\"$pendingVoiceText\"",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                val whenOptions = listOf(
+                    WhenOption.Now,
+                    WhenOption.ThisEvening,
+                    WhenOption.Tomorrow,
+                    WhenOption.ThisWeek,
+                    WhenOption.NoDate
+                )
+
+                whenOptions.forEach { option ->
+                    Button(
+                        onClick = {
+                            showWhenSheet = false
+                            val dueMs = when (option) {
+                                WhenOption.Now -> System.currentTimeMillis()
+                                WhenOption.ThisEvening -> Calendar.getInstance().apply {
+                                    set(Calendar.HOUR_OF_DAY, 18)
+                                    set(Calendar.MINUTE, 0)
+                                }.timeInMillis
+
+                                WhenOption.Tomorrow -> Calendar.getInstance().apply {
+                                    add(Calendar.DAY_OF_YEAR, 1)
+                                    set(Calendar.HOUR_OF_DAY, 9)
+                                    set(Calendar.MINUTE, 0)
+                                }.timeInMillis
+
+                                WhenOption.ThisWeek -> Calendar.getInstance().apply {
+                                    add(Calendar.DAY_OF_YEAR, 3)
+                                    set(Calendar.HOUR_OF_DAY, 9)
+                                    set(Calendar.MINUTE, 0)
+                                }.timeInMillis
+
+                                WhenOption.NoDate -> null
+                            }
+                            viewModel.addTasksFromVoice(
+                                pendingVoiceText,
+                                dueMs
+                            ) { onNavigateBack() }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (option == WhenOption.Now)
+                                ThistlePurple else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (option == WhenOption.Now)
+                                androidx.compose.ui.graphics.Color.White
+                            else MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Text(option.label)
+                    }
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -182,8 +273,7 @@ fun VoiceInputScreen(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "AI's working on it...",
-                        style = MaterialTheme.typography.bodyLarge,
+                        "AI's working on it...", style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (editableText.isNotBlank()) {
@@ -198,7 +288,6 @@ fun VoiceInputScreen(
                 }
 
                 isListening -> {
-                    // Pulsing mic
                     Box(
                         modifier = Modifier
                             .scale(scale)
@@ -213,8 +302,7 @@ fun VoiceInputScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Default.Mic,
-                                contentDescription = null,
+                                Icons.Default.Mic, null,
                                 tint = androidx.compose.ui.graphics.Color.White,
                                 modifier = Modifier.size(36.dp)
                             )
@@ -245,30 +333,25 @@ fun VoiceInputScreen(
                 }
 
                 hasResult -> {
-                    // Show editable result with option to re-record or confirm
                     Text(
-                        "Got it! Ye said:",
-                        style = MaterialTheme.typography.titleMedium,
+                        "Got it! Ye said:", style = MaterialTheme.typography.titleMedium,
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                     )
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = editableText,
-                        onValueChange = { editableText = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        value = editableText, onValueChange = { editableText = it },
+                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
                         label = { Text("Edit if needed") }
                     )
                     Spacer(Modifier.height(20.dp))
                     Button(
                         onClick = {
-                            viewModel.addTasksFromVoice(editableText) { onNavigateBack() }
+                            pendingVoiceText = editableText
+                            showWhenSheet = true
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = ThistlePurple)
-                    ) {
-                        Text("Create Tasks with AI")
-                    }
+                    ) { Text("Schedule Task") }
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = { startListening() }) {
                         Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
@@ -278,7 +361,6 @@ fun VoiceInputScreen(
                 }
 
                 else -> {
-                    // Not granted or waiting
                     Box(
                         modifier = Modifier
                             .size(96.dp)
@@ -286,8 +368,7 @@ fun VoiceInputScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Default.MicNone,
-                            contentDescription = null,
+                            Icons.Default.MicNone, null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(40.dp)
                         )
@@ -299,9 +380,7 @@ fun VoiceInputScreen(
                             else permissionState.launchPermissionRequest()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = ThistlePurple)
-                    ) {
-                        Text("Tap to speak")
-                    }
+                    ) { Text("Tap to speak") }
                 }
             }
         }

@@ -81,4 +81,7 @@ dependencies {
     // Permissions
     implementation(libs.accompanist.permissions)
     implementation(libs.androidx.work.runtime.ktx)
+
+    // Location — needed for FusedLocationProviderClient in SettingsViewModel
+    implementation(libs.play.services.location)
 }

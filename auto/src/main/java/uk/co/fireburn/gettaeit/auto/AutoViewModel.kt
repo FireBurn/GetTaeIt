@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
 import javax.inject.Inject
@@ -17,9 +18,14 @@ class AutoViewModel @Inject constructor(
 
     val tasks: StateFlow<List<TaskEntity>> = taskRepository.getTasksForCurrentMode()
         .stateIn(
-            // While a car screen is visible
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+    fun completeTask(task: TaskEntity) {
+        viewModelScope.launch {
+            taskRepository.completeTask(task)
+        }
+    }
 }

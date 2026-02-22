@@ -23,6 +23,8 @@ data class UserPreferences(
 ) {
     val workLocationLatLng: Pair<Double, Double>?
         get() = workLocationString?.split(',')?.let {
-            if (it.size == 2) it[0].toDoubleOrNull()!! to it[1].toDoubleOrNull()!! else null
+            val lat = it[0].toDoubleOrNull() ?: return@let null
+            val lng = it[1].toDoubleOrNull() ?: return@let null
+            lat to lng
         }
 }

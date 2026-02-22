@@ -4,6 +4,7 @@ import uk.co.fireburn.gettaeit.shared.data.MissedBehaviour
 import uk.co.fireburn.gettaeit.shared.data.RecurrenceConfig
 import uk.co.fireburn.gettaeit.shared.data.RecurrenceType
 import uk.co.fireburn.gettaeit.shared.data.TaskContext
+import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 import javax.inject.Inject
 
 data class BreakdownResult(
@@ -167,6 +168,11 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
             )
         }
 
+        // ── Time-aware multi-instance recurrence: "morning and night" ─────────
+        // Voice: "brush teeth every morning and night" → 2 separate tasks
+        val morningAndNight = ("morning" in p && ("night" in p || "evening" in p)) ||
+                "twice a day" in p || "twice daily" in p
+
         // ── Recurring household chores ────────────────────────────────────────
 
         if ("hoover" in p || "vacuum" in p || "clean" in p || "tidy" in p) {
@@ -175,7 +181,7 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
             val (recurType, interval) = when {
                 isMonthly -> RecurrenceType.MONTHLY to 1
                 isWeekly -> RecurrenceType.WEEKLY to 1
-                else -> RecurrenceType.WEEKLY to 1 // sensible default
+                else -> RecurrenceType.WEEKLY to 1
             }
             return listOf(
                 ParsedTask(
@@ -187,7 +193,7 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
                         type = recurType,
                         interval = interval,
                         missedBehaviour = MissedBehaviour.PERSISTENT,
-                        preferredTimeOfDayMinutes = 10 * 60 // 10am
+                        preferredTimeOfDayMinutes = 10 * 60
                     )
                 )
             )
@@ -225,6 +231,44 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
             )
         }
 
+        // ── Time-aware multi-slot recurring tasks ─────────────────────────────
+        // "walk the dog every morning and evening" → 2 tasks with different preferred times
+        if (morningAndNight) {
+            val taskTitle = prompt
+                .replace(
+                    Regex(
+                        "every\\s+(morning\\s+and\\s+(?:night|evening)|morning|night|evening|twice\\s+a\\s+day|twice\\s+daily)",
+                        RegexOption.IGNORE_CASE
+                    ), ""
+                )
+                .trim()
+                .replaceFirstChar { it.uppercase() }
+                .ifBlank { prompt.trim().replaceFirstChar { it.uppercase() } }
+
+            return listOf(
+                ParsedTask(
+                    title = "$taskTitle 🌅",
+                    suggestedContext = detectContext(prompt),
+                    estimatedMinutes = null,
+                    suggestedRecurrence = RecurrenceConfig(
+                        type = RecurrenceType.DAILY,
+                        missedBehaviour = MissedBehaviour.IGNORABLE,
+                        preferredTimeOfDayMinutes = 8 * 60  // 08:00
+                    )
+                ),
+                ParsedTask(
+                    title = "$taskTitle 🌙",
+                    suggestedContext = detectContext(prompt),
+                    estimatedMinutes = null,
+                    suggestedRecurrence = RecurrenceConfig(
+                        type = RecurrenceType.DAILY,
+                        missedBehaviour = MissedBehaviour.IGNORABLE,
+                        preferredTimeOfDayMinutes = 21 * 60 // 21:00
+                    )
+                )
+            )
+        }
+
         // ── Work tasks — one-off with sensible priority ───────────────────────
 
         val isWork = detectContext(prompt) == TaskContext.WORK
@@ -256,7 +300,7 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
             "clean", "laundry", "shopping", "garden", "dentist", "doctor",
             "gym", "cook", "dinner", "hoover", "vacuum", "tidy", "bins",
             "prescription", "kids", "school", "car", "mot", "plumber",
-            "teeth", "brush", "vitamin", "pill", "medication"
+            "teeth", "brush", "vitamin", "pill", "medication", "walk", "dog"
         )
         val workScore = workWords.count { it in p }
         val personalScore = personalWords.count { it in p }
@@ -269,9 +313,11 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
 }
 
 // ─── Gemini Nano strategy ─────────────────────────────────────────────────────
+// Stubbed: isAvailable() always returns false until AICore dependency is added.
+// The hybrid service falls back to TemplateStrategy transparently.
 
 class GeminiNanoStrategy @Inject constructor() : TaskBreakerStrategy {
-    override suspend fun isAvailable(): Boolean = false // TODO: check AICore availability
+    override suspend fun isAvailable(): Boolean = false
     override suspend fun generate(prompt: String): List<BreakdownResult> = emptyList()
 }
 
@@ -288,4 +334,25 @@ class HybridTaskService @Inject constructor(
     suspend fun parsePrompt(prompt: String): List<ParsedTask> = template.parsePrompt(prompt)
 
     fun detectContext(prompt: String): TaskContext = template.detectContext(prompt)
+
+    /**
+     * Learning loop: given historical completions for a task title, return
+     * an improved estimate of how long it takes (weighted average, recent completions
+     * weighted more heavily).
+     *
+     * Returns null if there is insufficient data (fewer than 2 samples).
+     */
+    fun improvedEstimate(historicalTasks: List<TaskEntity>): Int? {
+        val samples = historicalTasks
+            .mapNotNull { it.actualMinutes }
+            .filter { it > 0 }
+        if (samples.size < 2) return null
+
+        // Weighted average: more recent samples (later in list) count double
+        val recent = samples.takeLast(samples.size / 2 + 1)
+        val older = samples.dropLast(recent.size)
+        val weightedSum = recent.sum() * 2 + older.sum()
+        val weightedCount = recent.size * 2 + older.size
+        return (weightedSum.toDouble() / weightedCount).toInt().coerceAtLeast(1)
+    }
 }

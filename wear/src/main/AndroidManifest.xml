@@ -2,15 +2,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <uses-feature android:name="android.hardware.type.watch" />
 
     <application
         android:name=".GetTaeItWearApplication"
         android:allowBackup="true"
-        android:icon="@android:drawable/sym_def_app_icon"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault">
+
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
@@ -22,6 +26,7 @@
             </intent-filter>
         </activity>
 
+        <!-- Wear Data Layer: receive task updates and voice tasks from phone -->
         <service
             android:name="uk.co.fireburn.gettaeit.shared.DataLayerListenerService"
             android:exported="true">
@@ -33,6 +38,40 @@
                     android:scheme="wear" />
             </intent-filter>
         </service>
+
+        <!-- Wear Capability declaration so the phone knows this is a watch app -->
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="false" />
+
+        <!-- Task List Tile -->
+        <service
+            android:name=".tiles.TaskListTileService"
+            android:exported="true"
+            android:label="My Tasks"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@android:drawable/sym_def_app_icon" />
+        </service>
+
+        <!-- Voice / Add Task Tile -->
+        <service
+            android:name=".tiles.VoiceTileService"
+            android:exported="true"
+            android:label="Add Task"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@android:drawable/sym_def_app_icon" />
+        </service>
+
     </application>
 
 </manifest>

@@ -18,8 +18,9 @@ class DataLayerSync @Inject constructor(
     private val messageClient by lazy { Wearable.getMessageClient(context) }
     private val capabilityClient by lazy { Wearable.getCapabilityClient(context) }
 
-    suspend fun sendTaskUpdate(taskId: UUID, isCompleted: Boolean) {
-        try {
+    /** Send a task completion/uncompletion to the paired device. */
+    suspend fun sendTaskUpdate(taskId: UUID, isCompleted: Boolean): Boolean {
+        return try {
             val nodes = capabilityClient
                 .getCapability(WEAR_CAPABILITY, CapabilityClient.FILTER_REACHABLE)
                 .awaitTask()
@@ -29,15 +30,41 @@ class DataLayerSync @Inject constructor(
                 val path = "$TASK_UPDATE_PATH/$taskId"
                 val data = byteArrayOf(if (isCompleted) 1 else 0)
                 messageClient.sendMessage(node.id, path, data).awaitTask()
-            }
+                true
+            } ?: false
         } catch (_: Exception) {
-            // No watch connected — silently ignore
+            false
+        }
+    }
+
+    /**
+     * Send a voice-dictated task string from the watch to the phone.
+     * The phone's [DataLayerListenerService] receives it, parses it with the AI,
+     * and saves the resulting tasks.
+     * Returns true if the phone was reached, false if it wasn't connected.
+     */
+    suspend fun sendVoiceTask(text: String): Boolean {
+        return try {
+            val nodes = capabilityClient
+                .getCapability(PHONE_CAPABILITY, CapabilityClient.FILTER_REACHABLE)
+                .awaitTask()
+                .nodes
+
+            nodes.firstOrNull()?.let { node ->
+                val data = text.toByteArray(Charsets.UTF_8)
+                messageClient.sendMessage(node.id, VOICE_TASK_PATH, data).awaitTask()
+                true
+            } ?: false
+        } catch (_: Exception) {
+            false
         }
     }
 
     companion object {
-        private const val WEAR_CAPABILITY = "get_tae_it_wear_app"
-        private const val TASK_UPDATE_PATH = "/task-update"
+        const val WEAR_CAPABILITY = "get_tae_it_wear_app"
+        const val PHONE_CAPABILITY = "get_tae_it_phone_app"
+        const val TASK_UPDATE_PATH = "/task-update"
+        const val VOICE_TASK_PATH = "/voice-task"
     }
 }
 
@@ -45,7 +72,7 @@ class DataLayerSync @Inject constructor(
  * Suspending bridge for Google's [com.google.android.gms.tasks.Task] without
  * requiring the kotlinx-coroutines-play-services artifact.
  */
-private suspend fun <T> com.google.android.gms.tasks.Task<T>.awaitTask(): T =
+internal suspend fun <T> com.google.android.gms.tasks.Task<T>.awaitTask(): T =
     suspendCancellableCoroutine { cont ->
         addOnSuccessListener { result -> cont.resume(result) }
         addOnFailureListener { e -> cont.resumeWithException(e) }

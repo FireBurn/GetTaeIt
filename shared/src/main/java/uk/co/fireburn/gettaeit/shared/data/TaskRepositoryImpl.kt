@@ -57,6 +57,13 @@ class TaskRepositoryImpl @Inject constructor(
 
     override suspend fun getTaskById(id: UUID): TaskEntity? = taskDao.getTaskById(id)
 
+    override suspend fun getCompletedByTitle(title: String): List<TaskEntity> {
+        // Use a fuzzy LIKE pattern — strip emoji/punctuation for better matching
+        val cleaned = title.trim().take(30).replace(Regex("[^\\w\\s]"), "").trim()
+        val pattern = "%$cleaned%"
+        return taskDao.getCompletedByTitle(pattern)
+    }
+
     // ─── Writes ─────────────────────────────────────────────────────────────
 
     override suspend fun addTask(task: TaskEntity) = taskDao.insert(task)
