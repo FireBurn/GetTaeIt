@@ -19,15 +19,11 @@ class WearViewModel @Inject constructor(
 ) : ViewModel() {
 
     val tasks: StateFlow<List<TaskEntity>> = taskRepository.getTasksForCurrentMode()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun setTaskCompleted(task: TaskEntity, completed: Boolean) {
         viewModelScope.launch {
-            taskRepository.updateTask(task.copy(isCompleted = completed))
+            if (completed) taskRepository.completeTask(task) else taskRepository.uncompleteTask(task)
             dataLayerSync.sendTaskUpdate(task.id, completed)
         }
     }

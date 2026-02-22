@@ -1,43 +1,49 @@
 package uk.co.fireburn.gettaeit.shared.data
 
 import androidx.room.TypeConverter
-import com.google.android.gms.maps.model.LatLng
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.util.UUID
 
 class Converters {
+
+    private val gson = Gson()
+
+    // ── UUID List ────────────────────────────────────────────────────────────
     @TypeConverter
-    fun fromUUIDList(value: List<UUID>?): String? {
-        return value?.let { Gson().toJson(it) }
-    }
+    fun fromUUIDList(v: List<UUID>?): String? = v?.let { gson.toJson(it) }
 
     @TypeConverter
-    fun toUUIDList(value: String?): List<UUID>? {
-        val listType = object : TypeToken<List<UUID>>() {}.type
-        return value?.let { Gson().fromJson(it, listType) }
-    }
+    fun toUUIDList(v: String?): List<UUID>? =
+        v?.let { gson.fromJson(it, object : TypeToken<List<UUID>>() {}.type) }
+
+    // ── UUID (single, nullable) ──────────────────────────────────────────────
+    @TypeConverter
+    fun fromUUID(v: UUID?): String? = v?.toString()
 
     @TypeConverter
-    fun fromLatLng(latLng: LatLng?): String? {
-        return latLng?.let { "${it.latitude},${it.longitude}" }
-    }
+    fun toUUID(v: String?): UUID? = v?.let { UUID.fromString(it) }
+
+    // ── Int List ─────────────────────────────────────────────────────────────
+    @TypeConverter
+    fun fromIntList(v: List<Int>?): String? = v?.let { gson.toJson(it) }
 
     @TypeConverter
-    fun toLatLng(value: String?): LatLng? {
-        return value?.split(',')?.let {
-            LatLng(it[0].toDouble(), it[1].toDouble())
-        }
-    }
+    fun toIntList(v: String?): List<Int>? =
+        v?.let { gson.fromJson(it, object : TypeToken<List<Int>>() {}.type) }
+
+    // ── RecurrenceConfig ─────────────────────────────────────────────────────
+    @TypeConverter
+    fun fromRecurrenceConfig(v: RecurrenceConfig?): String? = v?.let { gson.toJson(it) }
 
     @TypeConverter
-    fun fromIntList(value: List<Int>?): String? {
-        return value?.let { Gson().toJson(it) }
-    }
+    fun toRecurrenceConfig(v: String?): RecurrenceConfig? =
+        v?.let { gson.fromJson(it, RecurrenceConfig::class.java) }
+
+    // ── TaskContext enum ─────────────────────────────────────────────────────
+    @TypeConverter
+    fun fromTaskContext(v: TaskContext?): String? = v?.name
 
     @TypeConverter
-    fun toIntList(value: String?): List<Int>? {
-        val listType = object : TypeToken<List<Int>>() {}.type
-        return value?.let { Gson().fromJson(it, listType) }
-    }
+    fun toTaskContext(v: String?): TaskContext? = v?.let { TaskContext.valueOf(it) }
 }

@@ -8,7 +8,6 @@ import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingClient
 import com.google.android.gms.location.GeofencingRequest
 import com.google.android.gms.location.LocationServices
-import com.google.android.gms.maps.model.LatLng
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,7 +16,7 @@ import javax.inject.Singleton
 
 @Singleton
 class LocationManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     private val geofencingClient: GeofencingClient = LocationServices.getGeofencingClient(context)
     private val _isAtWork = MutableStateFlow(false)
@@ -25,41 +24,27 @@ class LocationManager @Inject constructor(
 
     private val geofencePendingIntent: PendingIntent by lazy {
         val intent = Intent(context, GeofenceBroadcastReceiver::class.java)
-        // Use FLAG_IMMUTABLE for security best practices
         PendingIntent.getBroadcast(
-            context,
-            0,
-            intent,
+            context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
 
-    @SuppressLint("MissingPermission") // Permissions will be handled at the UI layer before calling this
-    fun addWorkGeofence(workLocation: LatLng) {
+    @SuppressLint("MissingPermission")
+    fun addWorkGeofence(latitude: Double, longitude: Double, radiusMetres: Float = 100f) {
         val geofence = Geofence.Builder()
             .setRequestId("WORK_GEOFENCE")
-            .setCircularRegion(
-                workLocation.latitude,
-                workLocation.longitude,
-                100f
-            ) // 100-meter radius
+            .setCircularRegion(latitude, longitude, radiusMetres)
             .setExpirationDuration(Geofence.NEVER_EXPIRE)
             .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT)
             .build()
 
-        val geofencingRequest = GeofencingRequest.Builder()
+        val request = GeofencingRequest.Builder()
             .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
             .addGeofence(geofence)
             .build()
 
-        geofencingClient.addGeofences(geofencingRequest, geofencePendingIntent).run {
-            addOnSuccessListener {
-                // Successfully added
-            }
-            addOnFailureListener {
-                // Failed to add
-            }
-        }
+        geofencingClient.addGeofences(request, geofencePendingIntent)
     }
 
     fun removeWorkGeofence() {

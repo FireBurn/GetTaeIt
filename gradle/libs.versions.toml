@@ -1,9 +1,9 @@
 [versions]
 # Build Constants
-androidGradlePlugin = "9.0.0"
-kotlin = "2.1.0"
-ksp = "2.1.0-1.0.29"
-hilt = "2.55"
+androidGradlePlugin = "9.0.1"
+kotlin = "2.2.10"
+ksp = "2.3.5"
+hilt = "2.59.1"
 googleServices = "4.4.2"
 firebaseCrashlyticsPlugin = "3.0.2"
 
@@ -70,6 +70,7 @@ generativeai = { group = "com.google.ai.client.generativeai", name = "generative
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutines" }
 
 # Firebase
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }

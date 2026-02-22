@@ -2,7 +2,6 @@ package uk.co.fireburn.gettaeit.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.gms.maps.model.LatLng
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,21 +26,28 @@ class SettingsViewModel @Inject constructor(
             initialValue = UserPreferences()
         )
 
-    fun setWorkLocation(location: LatLng) {
+    fun setWorkLocation(latitude: Double, longitude: Double) {
         viewModelScope.launch {
-            val currentPrefs = userPreferences.first()
-            val updatedPrefs = currentPrefs.copy(workLocation = location)
-            userPreferencesRepository.updateUserPreferences(updatedPrefs)
-            geofenceManager.addWorkGeofence(location.latitude, location.longitude)
+            val updated = userPreferences.first().copy(
+                workLocationString = "$latitude,$longitude"
+            )
+            userPreferencesRepository.updateUserPreferences(updated)
+            geofenceManager.addWorkGeofence(latitude, longitude)
         }
     }
 
     fun clearWorkLocation() {
         viewModelScope.launch {
-            val currentPrefs = userPreferences.first()
-            val updatedPrefs = currentPrefs.copy(workLocation = null)
-            userPreferencesRepository.updateUserPreferences(updatedPrefs)
+            val updated = userPreferences.first().copy(workLocationString = null)
+            userPreferencesRepository.updateUserPreferences(updated)
             geofenceManager.removeWorkGeofence()
+        }
+    }
+
+    fun setWorkSsid(ssid: String) {
+        viewModelScope.launch {
+            val updated = userPreferences.first().copy(workSsid = ssid.ifBlank { null })
+            userPreferencesRepository.updateUserPreferences(updated)
         }
     }
 }

@@ -21,30 +21,26 @@ import javax.inject.Singleton
 abstract class DatabaseModule {
 
     @Binds
-    abstract fun bindUserPreferencesRepository(
-        userPreferencesRepositoryImpl: UserPreferencesRepositoryImpl
-    ): UserPreferencesRepository
+    @Singleton
+    abstract fun bindTaskRepository(
+        impl: TaskRepositoryImpl
+    ): TaskRepository
 
     @Binds
-    abstract fun bindTaskRepository(
-        taskRepositoryImpl: TaskRepositoryImpl
-    ): TaskRepository
+    abstract fun bindUserPreferencesRepository(
+        impl: UserPreferencesRepositoryImpl
+    ): UserPreferencesRepository
 
     companion object {
         @Provides
         @Singleton
-        fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
-            return AppDatabase.getDatabase(context)
-        }
+        fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
+            AppDatabase.getDatabase(context)
 
         @Provides
-        fun provideTaskDao(appDatabase: AppDatabase): TaskDao {
-            return appDatabase.taskDao()
-        }
+        fun provideTaskDao(db: AppDatabase): TaskDao = db.taskDao()
 
         @Provides
-        fun provideUserPreferencesDao(appDatabase: AppDatabase): UserPreferencesDao {
-            return appDatabase.userPreferencesDao()
-        }
+        fun provideUserPreferencesDao(db: AppDatabase): UserPreferencesDao = db.userPreferencesDao()
     }
 }

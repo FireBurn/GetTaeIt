@@ -2,15 +2,11 @@ import java.io.FileInputStream
 import java.util.Properties
 
 plugins {
-    // Apply Kotlin plugins FIRST to avoid AGP conflict
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.android.application)
 
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.google.services)
-    alias(libs.plugins.firebase.crashlytics)
 }
 
 // Read the local.properties file
@@ -35,8 +31,6 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-
-        manifestPlaceholders["mapsApiKey"] = localProperties.getProperty("MAPS_API_KEY", "")
     }
 
     buildFeatures {
@@ -55,8 +49,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        jvmToolchain(17)
     }
 }
 
@@ -84,16 +78,6 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
-    // Maps
-    implementation(libs.play.services.maps)
-    implementation(libs.maps.compose)
-
     // Permissions
     implementation(libs.accompanist.permissions)
-
-    // Firebase
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth.ktx)
-    implementation(libs.firebase.crashlytics)
-    implementation(libs.play.services.auth)
 }

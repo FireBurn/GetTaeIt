@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
@@ -34,8 +33,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        jvmToolchain(17)
     }
     buildFeatures {
         compose = true
@@ -53,7 +52,6 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.play.services.wearable)
-    implementation(libs.play.services.maps)
 
     // Wear Core
     implementation("androidx.percentlayout:percentlayout:1.0.0")

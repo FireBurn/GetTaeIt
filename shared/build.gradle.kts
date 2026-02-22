@@ -1,8 +1,4 @@
-import java.io.FileInputStream
-import java.util.Properties
-
 plugins {
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android.library)
     alias(libs.plugins.hilt.android)
@@ -22,31 +18,17 @@ android {
         buildConfig = true
     }
 
-    val properties = Properties()
-    val localPropertiesFile = rootProject.file("local.properties")
-    if (localPropertiesFile.exists()) {
-        properties.load(FileInputStream(localPropertiesFile))
-    }
-
-    defaultConfig {
-        buildConfigField(
-            "String",
-            "GEMINI_API_KEY",
-            "\"${properties.getProperty("GEMINI_API_KEY", "")}\""
-        )
-    }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        jvmToolchain(17)
     }
 }
 
 dependencies {
-    // Room
+    // Room (offline-first database)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
@@ -61,24 +43,18 @@ dependencies {
     // Serialization
     implementation(libs.kotlinx.serialization.json)
 
-    // Firebase
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.firestore.ktx)
-    implementation(libs.firebase.auth.ktx)
-    implementation(libs.firebase.crashlytics)
+    // JSON (for Room TypeConverters)
+    implementation(libs.gson)
 
-    // Gemini
-    implementation(libs.generativeai)
-
-    // WorkManager
+    // WorkManager (background recurrence reset)
     implementation(libs.androidx.work.runtime.ktx)
 
-    // Location & Maps
+    // Location / Geofencing (no Maps UI — just the location services client)
     implementation(libs.play.services.location)
-    implementation(libs.play.services.maps)
-    implementation(libs.gson)
+
+    // Wearable Data Layer (phone <-> watch sync, no Firebase needed)
     implementation(libs.play.services.wearable)
 
-    // DataStore
+    // DataStore (user preferences)
     implementation(libs.androidx.datastore.preferences)
 }

@@ -1,9 +1,11 @@
 package uk.co.fireburn.gettaeit.shared.domain
 
-import com.google.firebase.auth.FirebaseUser
-import kotlinx.coroutines.flow.Flow
-
+/**
+ * Auth is intentionally minimal for now — the app is offline-first and
+ * does not require a Google account. This interface exists for future
+ * optional cloud backup.
+ */
 interface AuthRepository {
-    val currentUser: Flow<FirebaseUser?>
+    val isSignedIn: Boolean
     suspend fun signOut()
 }
