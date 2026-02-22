@@ -244,7 +244,10 @@ fun TaskGroupStateful(
     onDelete: () -> Unit,
     viewModel: MainViewModel = hiltViewModel()
 ) {
-    val subtasks by viewModel.getSubtasks(task.id).collectAsState()
+    val subtasks by remember(task.id) {
+        viewModel.getSubtasks(task.id)
+    }.collectAsState(initial = emptyList())
+
     val accent = if (task.context == TaskContext.WORK) WorkPrimary else PersonalPrimary
 
     // Check if this task is blocked (any dependency not yet complete)

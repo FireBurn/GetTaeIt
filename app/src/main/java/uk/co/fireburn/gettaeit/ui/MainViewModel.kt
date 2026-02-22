@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -244,8 +245,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { taskRepository.deleteTask(task) }
     }
 
-    fun getSubtasks(parentId: UUID) = taskRepository.getSubtasks(parentId)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    fun getSubtasks(parentId: UUID): Flow<List<TaskEntity>> = taskRepository.getSubtasks(parentId)
 
     // ── Voice input ───────────────────────────────────────────────────────────
 
