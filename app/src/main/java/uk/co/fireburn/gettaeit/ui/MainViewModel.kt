@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import uk.co.fireburn.gettaeit.notifications.ReminderScheduler
@@ -43,6 +44,8 @@ data class AddTaskUiState(
     val timesPerDay: Int = 1,
     val suggestedSubtasks: List<String> = emptyList(),
     val suggestedSubtaskMinutes: List<Int?> = emptyList(),
+    val manualSubtasks: List<String> = emptyList(),
+    val existingSubtasks: List<TaskEntity> = emptyList(),
     val isGeneratingSubtasks: Boolean = false
 )
 
@@ -64,7 +67,6 @@ class MainViewModel @Inject constructor(
     val appMode: StateFlow<AppMode> = contextManager.appMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppMode.PERSONAL)
 
-    /** All active top-level tasks — used for the dependency/blocker picker. */
     val allTasks: StateFlow<List<TaskEntity>> = taskRepository.getAllActiveToplevelTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -104,16 +106,11 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Auto-fills scheduling fields from the title using the AI template.
-     * Called when the user finishes typing a title and hasn't set a schedule yet.
-     */
     fun autoScheduleFromTitle() {
         val title = _addTaskState.value.title.ifBlank { return }
         viewModelScope.launch {
             val parsed = hybridTaskService.parsePrompt(title).firstOrNull() ?: return@launch
             val rec = parsed.suggestedRecurrence ?: return@launch
-            // Only auto-fill if user hasn't already set a recurrence
             if (_addTaskState.value.recurrenceType != RecurrenceType.NONE) return@launch
             _addTaskState.value = _addTaskState.value.copy(
                 recurrenceType = rec.type,
@@ -127,6 +124,8 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    // ── Subtask management ────────────────────────────────────────────────────
+
     fun removeSuggestedSubtask(index: Int) {
         _addTaskState.value = _addTaskState.value.copy(
             suggestedSubtasks = _addTaskState.value.suggestedSubtasks.toMutableList()
@@ -134,6 +133,37 @@ class MainViewModel @Inject constructor(
             suggestedSubtaskMinutes = _addTaskState.value.suggestedSubtaskMinutes.toMutableList()
                 .also { if (index < it.size) it.removeAt(index) }
         )
+    }
+
+    fun addManualSubtask(title: String) {
+        if (title.isBlank()) return
+        updateAddTaskState { copy(manualSubtasks = manualSubtasks + title.trim()) }
+    }
+
+    fun updateManualSubtaskTitle(index: Int, newTitle: String) {
+        updateAddTaskState {
+            val list = manualSubtasks.toMutableList()
+            list[index] = newTitle
+            copy(manualSubtasks = list)
+        }
+    }
+
+    fun removeManualSubtask(index: Int) {
+        updateAddTaskState {
+            copy(manualSubtasks = manualSubtasks.toMutableList().also { it.removeAt(index) })
+        }
+    }
+
+    fun updateExistingSubtaskTitle(id: UUID, newTitle: String) {
+        updateAddTaskState {
+            copy(existingSubtasks = existingSubtasks.map {
+                if (it.id == id) it.copy(title = newTitle) else it
+            })
+        }
+    }
+
+    fun removeExistingSubtask(task: TaskEntity) {
+        updateAddTaskState { copy(existingSubtasks = existingSubtasks.filter { it.id != task.id }) }
     }
 
     // ── Save task ─────────────────────────────────────────────────────────────
@@ -151,7 +181,6 @@ class MainViewModel @Inject constructor(
                 timesPerDay = state.timesPerDay
             )
             val parentId = UUID.randomUUID()
-            // Learning loop: check if we have historical actuals for this title
             val historicalTasks = taskRepository.getCompletedByTitle(state.title.trim())
             val learnedMinutes = hybridTaskService.improvedEstimate(historicalTasks)
 
@@ -169,20 +198,23 @@ class MainViewModel @Inject constructor(
                 estimatedMinutes = learnedMinutes
             )
             taskRepository.addTask(parentTask)
-            if (state.suggestedSubtasks.isNotEmpty()) {
-                taskRepository.addAll(state.suggestedSubtasks.mapIndexed { idx, title ->
+
+            val allNewSubs = state.suggestedSubtasks + state.manualSubtasks
+            if (allNewSubs.isNotEmpty()) {
+                taskRepository.addAll(allNewSubs.mapIndexed { idx, title ->
                     TaskEntity(
                         title = title,
                         context = state.context,
                         priority = state.priority,
                         parentId = parentId,
                         isSubtask = true,
-                        estimatedMinutes = state.suggestedSubtaskMinutes.getOrNull(idx),
+                        estimatedMinutes = if (idx < state.suggestedSubtasks.size) state.suggestedSubtaskMinutes.getOrNull(
+                            idx
+                        ) else null,
                         dependencyIds = emptyList()
                     )
                 })
             }
-            // Schedule reminders for recurring tasks
             if (parentTask.recurrence.type != RecurrenceType.NONE) {
                 reminderScheduler.scheduleTask(appContext, parentTask)
             }
@@ -196,14 +228,10 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             taskRepository.completeTask(task)
             dataLayerSync.sendTaskUpdate(task.id, true)
-            // Cancel today's remaining alarms; recurring tasks will be rescheduled by BootReceiver/next launch
             reminderScheduler.cancelTask(appContext, task)
         }
     }
 
-    /**
-     * Complete a subtask, then auto-complete the parent if all siblings are done.
-     */
     fun completeSubtask(task: TaskEntity) {
         viewModelScope.launch {
             taskRepository.completeTask(task)
@@ -216,7 +244,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             taskRepository.completeTask(task.copy(actualMinutes = actualMinutes))
             dataLayerSync.sendTaskUpdate(task.id, true)
-            // If it's a subtask, check parent too
             task.parentId?.let { taskRepository.autoCompleteParentIfDone(it) }
         }
     }
@@ -250,42 +277,70 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { taskRepository.deleteTask(task) }
     }
 
-    /**
-     * Loads an existing task into the add/edit sheet state so the user can modify it.
-     * Call this before navigating to AddTaskScreen in "edit mode".
-     */
-    fun loadTaskForEditing(task: TaskEntity) {
-        _addTaskState.value = AddTaskUiState(
-            title = task.title,
-            description = task.description ?: "",
-            context = task.context,
-            priority = task.priority,
-            recurrenceType = task.recurrence.type,
-            recurrenceInterval = task.recurrence.interval,
-            recurrenceDaysOfWeek = task.recurrence.daysOfWeek,
-            missedBehaviour = task.recurrence.missedBehaviour,
-            preferredTimeOfDayMinutes = task.recurrence.preferredTimeOfDayMinutes,
-            dueDate = task.dueDate,
-            parentId = task.parentId,
-            dependencyIds = task.dependencyIds,
-            timesPerDay = task.recurrence.timesPerDay
-        )
-        _editingTaskId.value = task.id
+    fun deleteTaskById(id: UUID) {
+        viewModelScope.launch {
+            taskRepository.getTaskById(id)?.let { taskRepository.deleteTask(it) }
+        }
     }
 
-    /** Non-null while an existing task is being edited (vs. a new task being created). */
+    fun loadTaskForEditing(task: TaskEntity) {
+        viewModelScope.launch {
+            val existingSubs = taskRepository.getSubtasks(task.id).first()
+            _addTaskState.value = AddTaskUiState(
+                title = task.title,
+                description = task.description ?: "",
+                context = task.context,
+                priority = task.priority,
+                recurrenceType = task.recurrence.type,
+                recurrenceInterval = task.recurrence.interval,
+                recurrenceDaysOfWeek = task.recurrence.daysOfWeek,
+                missedBehaviour = task.recurrence.missedBehaviour,
+                preferredTimeOfDayMinutes = task.recurrence.preferredTimeOfDayMinutes,
+                dueDate = task.dueDate,
+                parentId = task.parentId,
+                dependencyIds = task.dependencyIds,
+                timesPerDay = task.recurrence.timesPerDay,
+                existingSubtasks = existingSubs
+            )
+            _editingTaskId.value = task.id
+        }
+    }
+
     private val _editingTaskId = MutableStateFlow<UUID?>(null)
     val editingTaskId: StateFlow<UUID?> = _editingTaskId.asStateFlow()
 
-    /**
-     * Saves changes to an existing task. Called instead of [saveTask] when editing.
-     */
     fun saveTaskEdits() {
         val taskId = _editingTaskId.value ?: run { saveTask(); return }
         val state = _addTaskState.value
         if (state.title.isBlank()) return
+
         viewModelScope.launch {
             val existing = taskRepository.getTaskById(taskId) ?: return@launch
+
+            val dbSubtasks = taskRepository.getSubtasks(taskId).first()
+            val keptIds = state.existingSubtasks.map { it.id }
+            dbSubtasks.filter { it.id !in keptIds }.forEach { taskRepository.deleteTask(it) }
+
+            state.existingSubtasks.forEach { updatedSub ->
+                taskRepository.updateTask(updatedSub)
+            }
+
+            val newSubs = state.suggestedSubtasks + state.manualSubtasks
+            if (newSubs.isNotEmpty()) {
+                taskRepository.addAll(newSubs.mapIndexed { idx, title ->
+                    TaskEntity(
+                        title = title,
+                        context = state.context,
+                        priority = state.priority,
+                        parentId = taskId,
+                        isSubtask = true,
+                        estimatedMinutes = if (idx < state.suggestedSubtasks.size) state.suggestedSubtaskMinutes.getOrNull(
+                            idx
+                        ) else null
+                    )
+                })
+            }
+
             val recurrenceConfig = RecurrenceConfig(
                 type = state.recurrenceType,
                 interval = state.recurrenceInterval,
@@ -304,6 +359,7 @@ class MainViewModel @Inject constructor(
                 dependencyIds = state.dependencyIds
             )
             taskRepository.updateTask(updated)
+
             if (updated.recurrence.type != RecurrenceType.NONE) {
                 reminderScheduler.scheduleTask(appContext, updated)
             }
@@ -312,7 +368,6 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    /** Call when the edit sheet is dismissed without saving. */
     fun cancelEdit() {
         _editingTaskId.value = null
         resetAddTaskState()
@@ -324,10 +379,6 @@ class MainViewModel @Inject constructor(
 
     val isParsingVoice = MutableStateFlow(false)
 
-    /**
-     * Parses a voice/text prompt using the full AI template (supports multi-task expansion,
-     * auto-scheduling, and subtasks). Saves all resulting tasks and calls [onComplete].
-     */
     fun addTasksFromVoice(prompt: String, dueDate: Long? = null, onComplete: () -> Unit = {}) {
         if (prompt.isBlank()) return
         viewModelScope.launch {
@@ -344,21 +395,19 @@ class MainViewModel @Inject constructor(
                         ?: RecurrenceConfig(type = RecurrenceType.NONE)
 
                     val parentId = UUID.randomUUID()
-                    taskRepository.addTask(
-                        TaskEntity(
-                            id = parentId,
-                            title = parsed.title,
-                            context = context,
-                            priority = 3,
-                            recurrence = recurrence,
-                            estimatedMinutes = parsed.estimatedMinutes,
-                            // Use the user-selected due date from the "When?" sheet.
-                            // If the template already inferred a preferred time, prefer that
-                            // over the sheet's generic timestamp — but only if no explicit
-                            // due date was provided.
-                            dueDate = dueDate
-                        )
+
+                    val parentTask = TaskEntity(
+                        id = parentId,
+                        title = parsed.title,
+                        context = context,
+                        priority = 3,
+                        recurrence = recurrence,
+                        estimatedMinutes = parsed.estimatedMinutes,
+                        dueDate = dueDate
                     )
+
+                    taskRepository.addTask(parentTask)
+
                     if (parsed.subtasks.isNotEmpty()) {
                         taskRepository.addAll(parsed.subtasks.map { result ->
                             TaskEntity(
@@ -372,6 +421,11 @@ class MainViewModel @Inject constructor(
                             )
                         })
                     }
+
+                    // CRITICAL FIX: Ensure background alarms are scheduled for voice tasks!
+                    if (parentTask.recurrence.type != RecurrenceType.NONE) {
+                        reminderScheduler.scheduleTask(appContext, parentTask)
+                    }
                 }
             } finally {
                 isParsingVoice.value = false
@@ -380,7 +434,6 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    /** Re-schedule all active recurring tasks (called e.g. after returning from Settings). */
     fun rescheduleAllReminders() {
         viewModelScope.launch {
             taskRepository.getAllActiveToplevelTasks().collect { tasks ->

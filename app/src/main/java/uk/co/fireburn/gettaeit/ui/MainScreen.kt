@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -31,7 +32,7 @@ import uk.co.fireburn.gettaeit.ui.navigation.Screen
 import uk.co.fireburn.gettaeit.ui.theme.ThistlePurple
 
 @Composable
-fun MainScreen() {
+fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
     val navController = rememberNavController()
     val navItems = listOf(
         Screen.TaskList,
@@ -60,7 +61,10 @@ fun MainScreen() {
                 }
                 // Primary add FAB
                 FloatingActionButton(
-                    onClick = { navController.navigate("add_task") },
+                    onClick = {
+                        viewModel.cancelEdit() // Clear any existing edit state
+                        navController.navigate("add_task")
+                    },
                     containerColor = ThistlePurple,
                     contentColor = Color.White,
                     elevation = FloatingActionButtonDefaults.elevation(8.dp)
@@ -96,22 +100,32 @@ fun MainScreen() {
         NavHost(
             navController = navController,
             startDestination = Screen.TaskList.route,
-            modifier = Modifier.padding(innerPadding)
+            // Only pad the bottom to avoid double-padding the TopAppBar
+            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
         ) {
             composable(Screen.TaskList.route) {
-                TaskListScreen(onAddTaskClicked = {})
+                TaskListScreen(
+                    viewModel = viewModel, // Share ViewModel
+                    onAddTaskClicked = { navController.navigate("add_task") }
+                )
             }
             composable(Screen.KitchenDashboard.route) {
-                KitchenDashboardScreen()
+                KitchenDashboardScreen() // Uses its own specific ViewModel
             }
             composable(Screen.Settings.route) {
-                SettingsScreen()
+                SettingsScreen() // Uses its own specific ViewModel
             }
             composable("add_task") {
-                AddTaskScreen(onTaskAdded = { navController.popBackStack() })
+                AddTaskScreen(
+                    viewModel = viewModel, // Share ViewModel
+                    onTaskAdded = { navController.popBackStack() }
+                )
             }
             composable("voice_add_task") {
-                VoiceInputScreen(onNavigateBack = { navController.popBackStack() })
+                VoiceInputScreen(
+                    viewModel = viewModel, // Share ViewModel
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
         }
     }

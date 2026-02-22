@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Remove
@@ -41,6 +42,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,6 +70,8 @@ fun AddTaskScreen(
     val editingTaskId by viewModel.editingTaskId.collectAsState()
     val isEditing = editingTaskId != null
 
+    var newSubtaskTitle by remember { mutableStateOf("") }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -81,6 +87,18 @@ fun AddTaskScreen(
                     }
                 },
                 actions = {
+                    if (isEditing) {
+                        IconButton(onClick = {
+                            editingTaskId?.let { viewModel.deleteTaskById(it) }
+                            onTaskAdded()
+                        }) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                "Delete",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                     Button(
                         onClick = {
                             if (isEditing) viewModel.saveTaskEdits() else viewModel.saveTask()
@@ -232,6 +250,62 @@ fun AddTaskScreen(
                     onRemove = { idx -> viewModel.removeSuggestedSubtask(idx) }
                 )
             }
+
+            // ── Subtasks (Manual & Existing) ─────────────────────────────────
+            SectionLabel("Subtasks")
+
+            // Existing Subtasks (if editing)
+            state.existingSubtasks.forEach { sub ->
+                OutlinedTextField(
+                    value = sub.title,
+                    onValueChange = { viewModel.updateExistingSubtaskTitle(sub.id, it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    singleLine = true,
+                    trailingIcon = {
+                        IconButton(onClick = { viewModel.removeExistingSubtask(sub) }) {
+                            Icon(Icons.Filled.Close, "Remove")
+                        }
+                    }
+                )
+            }
+
+            // Manual Subtasks
+            state.manualSubtasks.forEachIndexed { index, title ->
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { viewModel.updateManualSubtaskTitle(index, it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    singleLine = true,
+                    trailingIcon = {
+                        IconButton(onClick = { viewModel.removeManualSubtask(index) }) {
+                            Icon(Icons.Filled.Close, "Remove")
+                        }
+                    }
+                )
+            }
+
+            // Add New Subtask Field
+            OutlinedTextField(
+                value = newSubtaskTitle,
+                onValueChange = { newSubtaskTitle = it },
+                placeholder = { Text("Add a manual subtask...") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                trailingIcon = {
+                    if (newSubtaskTitle.isNotBlank()) {
+                        IconButton(onClick = {
+                            viewModel.addManualSubtask(newSubtaskTitle)
+                            newSubtaskTitle = ""
+                        }) {
+                            Icon(Icons.Filled.Add, "Add", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            )
 
             Spacer(Modifier.height(32.dp))
         }

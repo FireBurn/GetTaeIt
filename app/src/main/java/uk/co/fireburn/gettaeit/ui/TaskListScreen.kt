@@ -8,12 +8,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -85,7 +88,6 @@ fun TaskListScreen(
     val appMode by viewModel.appMode.collectAsState()
     val allTasks by viewModel.allTasks.collectAsState()
 
-    // Build a map of id -> how many tasks depend on each task (for "unblocks N" badge)
     val unblocksCount = remember(allTasks) {
         val map = mutableMapOf<java.util.UUID, Int>()
         allTasks.forEach { t ->
@@ -96,7 +98,11 @@ fun TaskListScreen(
         map
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars) // Push content below the status bar!
+    ) {
         ContextBanner(mode = appMode)
         if (tasks.isEmpty()) {
             EmptyState(mode = appMode)
@@ -121,7 +127,7 @@ fun TaskListScreen(
                         onDelete = { viewModel.deleteTask(task) },
                         onEdit = {
                             viewModel.loadTaskForEditing(task)
-                            onAddTaskClicked() // navigate to the Add/Edit screen
+                            onAddTaskClicked()
                         }
                     )
                 }
@@ -189,18 +195,6 @@ private fun ContextBanner(mode: AppMode) {
 }
 
 // ─── Task group: subtask cards stacked, parent footer beneath ────────────────
-//
-// Layout:
-//   ┌─────────────────────────────────┐
-//   │  Subtask 1            5m    [ ] │  ← individual subtask card
-//   ├─────────────────────────────────┤
-//   │  Subtask 2           10m    [ ] │
-//   ├─────────────────────────────────┤
-//   │  ▏ Parent task title            │  ← parent footer (accent left border)
-//   │  ▏ Daily  ·  🔑 Unblocks 2     │
-//   └─────────────────────────────────┘
-//
-// If no subtasks, just the parent card is shown (slightly taller).
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -250,8 +244,6 @@ fun TaskGroupStateful(
     }.collectAsState(initial = emptyList())
 
     val accent = if (task.context == TaskContext.WORK) WorkPrimary else PersonalPrimary
-
-    // Check if this task is blocked (any dependency not yet complete)
     val blockers =
         task.dependencyIds.mapNotNull { depId -> allTasks.firstOrNull { it.id == depId } }
     val isBlocked = blockers.any { !it.isCompleted }
@@ -260,8 +252,6 @@ fun TaskGroupStateful(
     val totalCount = subtasks.size
 
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-
-        // ── Subtask cards (shown first, most prominent) ────────────────────
         subtasks.forEach { sub ->
             SubtaskCard(
                 subtask = sub,
@@ -270,8 +260,6 @@ fun TaskGroupStateful(
                 onCompleteWithTime = { mins -> onCompleteSubtaskWithTime(sub, mins) }
             )
         }
-
-        // ── Parent footer card ─────────────────────────────────────────────
         ParentFooterCard(
             task = task,
             accent = accent,
@@ -332,7 +320,6 @@ private fun SubtaskCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Completion icon
             Icon(
                 if (done) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
                 contentDescription = if (done) "Done" else "Complete",
@@ -340,7 +327,6 @@ private fun SubtaskCard(
                 modifier = Modifier.size(22.dp)
             )
 
-            // Title
             Text(
                 text = subtask.title,
                 style = MaterialTheme.typography.bodyMedium,
@@ -353,7 +339,6 @@ private fun SubtaskCard(
                 overflow = TextOverflow.Ellipsis
             )
 
-            // Time estimate
             subtask.estimatedMinutes?.let { mins ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -413,7 +398,6 @@ private fun ParentFooterCard(
         )
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
-            // Left accent bar
             Box(
                 modifier = Modifier
                     .width(5.dp)
@@ -444,7 +428,6 @@ private fun ParentFooterCard(
                     )
                 }
 
-                // Progress if has subtasks
                 if (totalCount > 0) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -468,7 +451,6 @@ private fun ParentFooterCard(
                     }
                 }
 
-                // Meta chips row
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -489,7 +471,6 @@ private fun ParentFooterCard(
                             accent
                         )
                     }
-                    // 🔑 Unblocks badge — shows if other tasks depend on this one
                     if (unblocksCount > 0) {
                         MetaChip(
                             Icons.Filled.Key,
@@ -497,7 +478,6 @@ private fun ParentFooterCard(
                             Color(0xFF2E7D32)
                         )
                     }
-                    // 🔒 Blocked badge — shows what's blocking this
                     if (isBlocked) {
                         MetaChip(
                             Icons.Filled.Lock,
@@ -514,7 +494,6 @@ private fun ParentFooterCard(
                     }
                 }
 
-                // Blocker names (collapsed to one line if long)
                 if (isBlocked) {
                     val blockerNames =
                         blockers.filter { !it.isCompleted }.joinToString(" · ") { it.title }
@@ -528,7 +507,6 @@ private fun ParentFooterCard(
                 }
             }
 
-            // ⋮ menu
             Box {
                 IconButton(onClick = { showMenu = true }) {
                     Icon(
@@ -552,19 +530,17 @@ private fun ParentFooterCard(
                         leadingIcon = { Icon(Icons.Filled.WbSunny, null) },
                         onClick = { onSnoozeTomorrow(); showMenu = false }
                     )
-                    if (task.recurrence.type == RecurrenceType.NONE) {
-                        DropdownMenuItem(
-                            text = { Text("Delete") },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Filled.Delete,
-                                    null,
-                                    tint = Color(0xFFD32F2F)
-                                )
-                            },
-                            onClick = { onDelete(); showMenu = false }
-                        )
-                    }
+                    DropdownMenuItem(
+                        text = { Text("Delete") },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Filled.Delete,
+                                null,
+                                tint = Color(0xFFD32F2F)
+                            )
+                        },
+                        onClick = { onDelete(); showMenu = false }
+                    )
                 }
             }
         }

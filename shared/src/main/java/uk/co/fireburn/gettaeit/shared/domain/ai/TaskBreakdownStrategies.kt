@@ -1,5 +1,8 @@
 package uk.co.fireburn.gettaeit.shared.domain.ai
 
+import android.util.Log
+import com.google.mlkit.genai.common.FeatureStatus
+import com.google.mlkit.genai.prompt.Generation
 import uk.co.fireburn.gettaeit.shared.data.MissedBehaviour
 import uk.co.fireburn.gettaeit.shared.data.RecurrenceConfig
 import uk.co.fireburn.gettaeit.shared.data.RecurrenceType
@@ -14,38 +17,26 @@ data class BreakdownResult(
     val estimatedMinutes: Int? = null
 )
 
-/**
- * A fully parsed task suggestion from a voice or text prompt.
- * May expand into multiple top-level tasks (e.g. "brush teeth" → morning + evening).
- */
 data class ParsedTask(
     val title: String,
     val suggestedContext: TaskContext,
     val subtasks: List<BreakdownResult> = emptyList(),
-    /** AI-suggested recurrence. Null = one-off. */
     val suggestedRecurrence: RecurrenceConfig? = null,
-    /**
-     * Minutes from midnight for the preferred start time of this task instance.
-     * e.g. 480 = 08:00, 1200 = 20:00
-     */
     val preferredTimeMinutes: Int? = null,
     val estimatedMinutes: Int? = null
 )
 
-// ─── Strategy interface ───────────────────────────────────────────────────────
-
 interface TaskBreakerStrategy {
     suspend fun isAvailable(): Boolean
     suspend fun generate(prompt: String): List<BreakdownResult>
+    suspend fun parsePrompt(prompt: String): List<ParsedTask>
 }
 
-// ─── Template strategy (offline, always available) ───────────────────────────
+// ─── Template strategy (offline fallback) ────────────────────────────────────
 
 class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
 
     override suspend fun isAvailable(): Boolean = true
-
-    // ── Subtask breakdown (called for manual add / AI breakdown button) ───────
 
     override suspend fun generate(prompt: String): List<BreakdownResult> {
         val p = prompt.lowercase()
@@ -118,13 +109,56 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
         }
     }
 
-    // ── Full parse: returns one or more ParsedTasks ───────────────────────────
-    // Used by voice input and smart scheduling.
-
-    suspend fun parsePrompt(prompt: String): List<ParsedTask> {
+    override suspend fun parsePrompt(prompt: String): List<ParsedTask> {
         val p = prompt.lowercase()
 
-        // ── Habits: expand into multiple timed tasks ──────────────────────────
+        val morningAndNight = ("morning" in p && ("night" in p || "evening" in p)) ||
+                "twice a day" in p || "twice daily" in p || "2 times a day" in p
+
+        if (morningAndNight) {
+            val taskTitle = prompt
+                .replace(
+                    Regex(
+                        "every\\s+(morning\\s+and\\s+(?:night|evening)|morning|night|evening|twice\\s+a\\s+day|twice\\s+daily)",
+                        RegexOption.IGNORE_CASE
+                    ), ""
+                )
+                .replace(
+                    Regex(
+                        "twice\\s+a\\s+day|twice\\s+daily|2\\s+times\\s+a\\s+day",
+                        RegexOption.IGNORE_CASE
+                    ), ""
+                )
+                .trim()
+                .replaceFirstChar { it.uppercase() }
+                .ifBlank { prompt.trim().replaceFirstChar { it.uppercase() } }
+
+            val isTeeth = "teeth" in p || "brush" in p
+            val estMins = if (isTeeth) 3 else null
+
+            return listOf(
+                ParsedTask(
+                    title = "$taskTitle 🌅",
+                    suggestedContext = detectContext(prompt),
+                    estimatedMinutes = estMins,
+                    suggestedRecurrence = RecurrenceConfig(
+                        type = RecurrenceType.DAILY,
+                        missedBehaviour = MissedBehaviour.IGNORABLE,
+                        preferredTimeOfDayMinutes = 8 * 60
+                    )
+                ),
+                ParsedTask(
+                    title = "$taskTitle 🌙",
+                    suggestedContext = detectContext(prompt),
+                    estimatedMinutes = estMins,
+                    suggestedRecurrence = RecurrenceConfig(
+                        type = RecurrenceType.DAILY,
+                        missedBehaviour = MissedBehaviour.IGNORABLE,
+                        preferredTimeOfDayMinutes = 21 * 60
+                    )
+                )
+            )
+        }
 
         if ("brush teeth" in p || "brush my teeth" in p || "teeth" in p) {
             return listOf(
@@ -135,8 +169,7 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
                     suggestedRecurrence = RecurrenceConfig(
                         type = RecurrenceType.DAILY,
                         missedBehaviour = MissedBehaviour.IGNORABLE,
-                        preferredTimeOfDayMinutes = 8 * 60,  // first reminder at 08:00
-                        timesPerDay = 2                       // morning + evening
+                        preferredTimeOfDayMinutes = 8 * 60
                     )
                 )
             )
@@ -145,8 +178,6 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
         if ("vitamin" in p || "vitamins" in p || "pill" in p || "pills" in p ||
             "medication" in p || "medicine" in p || "tablet" in p
         ) {
-            val threeADay = "3" in p || "three" in p || "times a day" in p || "tds" in p
-            val timesPerDay = if (threeADay) 3 else 4
             val noun = when {
                 "vitamin" in p || "vitamins" in p -> "vitamins"
                 "tablet" in p -> "tablet"
@@ -161,19 +192,11 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
                     suggestedRecurrence = RecurrenceConfig(
                         type = RecurrenceType.DAILY,
                         missedBehaviour = MissedBehaviour.IGNORABLE,
-                        preferredTimeOfDayMinutes = 8 * 60,  // first reminder at 08:00
-                        timesPerDay = timesPerDay
+                        preferredTimeOfDayMinutes = 8 * 60
                     )
                 )
             )
         }
-
-        // ── Time-aware multi-instance recurrence: "morning and night" ─────────
-        // Voice: "brush teeth every morning and night" → 2 separate tasks
-        val morningAndNight = ("morning" in p && ("night" in p || "evening" in p)) ||
-                "twice a day" in p || "twice daily" in p
-
-        // ── Recurring household chores ────────────────────────────────────────
 
         if ("hoover" in p || "vacuum" in p || "clean" in p || "tidy" in p) {
             val isWeekly = "week" in p || "weekly" in p
@@ -231,46 +254,6 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
             )
         }
 
-        // ── Time-aware multi-slot recurring tasks ─────────────────────────────
-        // "walk the dog every morning and evening" → 2 tasks with different preferred times
-        if (morningAndNight) {
-            val taskTitle = prompt
-                .replace(
-                    Regex(
-                        "every\\s+(morning\\s+and\\s+(?:night|evening)|morning|night|evening|twice\\s+a\\s+day|twice\\s+daily)",
-                        RegexOption.IGNORE_CASE
-                    ), ""
-                )
-                .trim()
-                .replaceFirstChar { it.uppercase() }
-                .ifBlank { prompt.trim().replaceFirstChar { it.uppercase() } }
-
-            return listOf(
-                ParsedTask(
-                    title = "$taskTitle 🌅",
-                    suggestedContext = detectContext(prompt),
-                    estimatedMinutes = null,
-                    suggestedRecurrence = RecurrenceConfig(
-                        type = RecurrenceType.DAILY,
-                        missedBehaviour = MissedBehaviour.IGNORABLE,
-                        preferredTimeOfDayMinutes = 8 * 60  // 08:00
-                    )
-                ),
-                ParsedTask(
-                    title = "$taskTitle 🌙",
-                    suggestedContext = detectContext(prompt),
-                    estimatedMinutes = null,
-                    suggestedRecurrence = RecurrenceConfig(
-                        type = RecurrenceType.DAILY,
-                        missedBehaviour = MissedBehaviour.IGNORABLE,
-                        preferredTimeOfDayMinutes = 21 * 60 // 21:00
-                    )
-                )
-            )
-        }
-
-        // ── Work tasks — one-off with sensible priority ───────────────────────
-
         val isWork = detectContext(prompt) == TaskContext.WORK
         val subtasks = generate(prompt)
         val totalMins =
@@ -285,8 +268,6 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
             )
         )
     }
-
-    // ── Context detection ─────────────────────────────────────────────────────
 
     fun detectContext(prompt: String): TaskContext {
         val p = prompt.lowercase()
@@ -312,13 +293,179 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
     }
 }
 
-// ─── Gemini Nano strategy ─────────────────────────────────────────────────────
-// Stubbed: isAvailable() always returns false until AICore dependency is added.
-// The hybrid service falls back to TemplateStrategy transparently.
+// ─── ML Kit GenAI (True On-Device) strategy ───────────────────────────────────
 
-class GeminiNanoStrategy @Inject constructor() : TaskBreakerStrategy {
-    override suspend fun isAvailable(): Boolean = false
-    override suspend fun generate(prompt: String): List<BreakdownResult> = emptyList()
+class GeminiNanoStrategy @Inject constructor(
+    private val templateFallback: TemplateStrategy
+) : TaskBreakerStrategy {
+
+    private val TAG = "MLKitGenAIDebug"
+
+    override suspend fun isAvailable(): Boolean {
+        Log.i(TAG, "Checking ML Kit GenAI status...")
+        return try {
+            val model = Generation.getClient()
+            val status = model.checkStatus()
+
+            when (status) {
+                FeatureStatus.AVAILABLE -> {
+                    Log.i(TAG, "Nano is AVAILABLE! Ready to use.")
+                    true
+                }
+
+                FeatureStatus.DOWNLOADABLE -> {
+                    Log.i(
+                        TAG,
+                        "Nano is DOWNLOADABLE. Instructing Play Services to download it now..."
+                    )
+                    model.download().collect { dlStatus ->
+                        Log.d(TAG, "Download progress: $dlStatus")
+                    }
+                    false
+                }
+
+                FeatureStatus.UNAVAILABLE -> {
+                    Log.w(TAG, "Nano is UNAVAILABLE on this specific device model.")
+                    false
+                }
+
+                else -> false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to check status: ${e.message}", e)
+            false
+        }
+    }
+
+    override suspend fun generate(prompt: String): List<BreakdownResult> {
+        Log.i(TAG, "Generating subtasks locally via ML Kit...")
+        return try {
+            val model = Generation.getClient()
+
+            // Using plain text delimited by pipe. Extremely resilient to LLM cutoff.
+            val promptText = """
+                List max 3 steps to complete this task: "$prompt"
+                Output each step on a new line using EXACTLY this format: Title|Minutes
+                Example:
+                Clear the desk|5
+                Wipe surfaces|10
+                
+                Do not output any markdown, intro, or extra text.
+            """.trimIndent()
+
+            val response = model.generateContent(promptText)
+            val responseText = response.candidates.firstOrNull()?.text ?: ""
+            Log.i(TAG, "ML Kit raw response:\n$responseText")
+
+            val results = mutableListOf<BreakdownResult>()
+
+            // Fault-tolerant parsing: we process line by line. If it got cut off,
+            // the last line might fail the parts.size == 2 check and just be ignored safely.
+            responseText.lines().forEach { line ->
+                val cleanLine = line.trim().removePrefix("-").removePrefix("*").trim()
+                if (cleanLine.isNotBlank() && cleanLine.contains("|")) {
+                    val parts = cleanLine.split("|")
+                    if (parts.size >= 2) {
+                        val title = parts[0].trim()
+                        val mins = parts[1].trim().filter { it.isDigit() }.toIntOrNull()
+                        if (title.isNotBlank()) {
+                            results.add(
+                                BreakdownResult(
+                                    title = title,
+                                    icon = "🔹",
+                                    estimatedMinutes = mins
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+            results
+        } catch (e: Exception) {
+            Log.e(TAG, "ML Kit generation failed: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    override suspend fun parsePrompt(prompt: String): List<ParsedTask> {
+        Log.i(TAG, "Parsing voice prompt locally via ML Kit...")
+        return try {
+            val model = Generation.getClient()
+
+            // Using plain text structure to completely avoid JSON decoding crashes
+            val promptText = """
+                Extract 1 main task and max 10 subtasks from the request and estimate the time in minutes: "$prompt"
+                Output EXACTLY in this format on separate lines:
+                MAIN: Task Title|30
+                SUB: Step one|10
+                SUB: Step two|20
+                
+                Do not output any markdown or intro text.
+            """.trimIndent()
+
+            val response = model.generateContent(promptText)
+            val responseText = response.candidates.firstOrNull()?.text ?: ""
+            Log.i(TAG, "ML Kit parse response:\n$responseText")
+
+            var mainTitle = "New Task"
+            var mainContext = TaskContext.PERSONAL
+            var mainMins: Int? = null
+            val parsedSubtasks = mutableListOf<BreakdownResult>()
+
+            // Resilient line-by-line parsing
+            responseText.lines().forEach { line ->
+                val cleanLine = line.trim().removePrefix("-").removePrefix("*").trim()
+
+                if (cleanLine.startsWith("MAIN:", ignoreCase = true)) {
+                    val content = cleanLine.substring(5).trim()
+                    val parts = content.split("|")
+                    if (parts.isNotEmpty()) mainTitle = parts[0].trim()
+                    if (parts.size > 1) {
+                        mainContext = if (parts[1].trim()
+                                .equals("WORK", true)
+                        ) TaskContext.WORK else TaskContext.PERSONAL
+                    }
+                    if (parts.size > 2) {
+                        mainMins = parts[2].trim().filter { it.isDigit() }.toIntOrNull()
+                    }
+                } else if (cleanLine.startsWith("SUB:", ignoreCase = true)) {
+                    val content = cleanLine.substring(4).trim()
+                    val parts = content.split("|")
+                    if (parts.isNotEmpty()) {
+                        val subTitle = parts[0].trim()
+                        val subMins = if (parts.size > 1) parts[1].trim().filter { it.isDigit() }
+                            .toIntOrNull() else null
+                        if (subTitle.isNotBlank()) {
+                            parsedSubtasks.add(
+                                BreakdownResult(
+                                    title = subTitle,
+                                    icon = "🔹",
+                                    estimatedMinutes = subMins
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Borrow the reliable template rules for scheduled repeating tasks
+            val templateRule = templateFallback.parsePrompt(prompt).firstOrNull()
+
+            listOf(
+                ParsedTask(
+                    title = mainTitle,
+                    suggestedContext = mainContext,
+                    estimatedMinutes = mainMins,
+                    subtasks = parsedSubtasks,
+                    suggestedRecurrence = templateRule?.suggestedRecurrence,
+                    preferredTimeMinutes = templateRule?.preferredTimeMinutes
+                )
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "ML Kit parse failed, falling back to template: ${e.message}", e)
+            templateFallback.parsePrompt(prompt)
+        }
+    }
 }
 
 // ─── Hybrid service ───────────────────────────────────────────────────────────
@@ -330,25 +477,17 @@ class HybridTaskService @Inject constructor(
     suspend fun generateSubtasks(prompt: String): List<BreakdownResult> =
         if (nano.isAvailable()) nano.generate(prompt) else template.generate(prompt)
 
-    /** Fully parse a voice/text prompt into one or more scheduled tasks. */
-    suspend fun parsePrompt(prompt: String): List<ParsedTask> = template.parsePrompt(prompt)
+    suspend fun parsePrompt(prompt: String): List<ParsedTask> =
+        if (nano.isAvailable()) nano.parsePrompt(prompt) else template.parsePrompt(prompt)
 
     fun detectContext(prompt: String): TaskContext = template.detectContext(prompt)
 
-    /**
-     * Learning loop: given historical completions for a task title, return
-     * an improved estimate of how long it takes (weighted average, recent completions
-     * weighted more heavily).
-     *
-     * Returns null if there is insufficient data (fewer than 2 samples).
-     */
     fun improvedEstimate(historicalTasks: List<TaskEntity>): Int? {
         val samples = historicalTasks
             .mapNotNull { it.actualMinutes }
             .filter { it > 0 }
         if (samples.size < 2) return null
 
-        // Weighted average: more recent samples (later in list) count double
         val recent = samples.takeLast(samples.size / 2 + 1)
         val older = samples.dropLast(recent.size)
         val weightedSum = recent.sum() * 2 + older.sum()

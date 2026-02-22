@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -47,7 +48,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.google.accompanist.permissions.rememberPermissionState
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
@@ -77,15 +80,17 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         Calendar.SUNDAY to "Sun"
     )
 
-    val locationPermissions = rememberMultiplePermissionsState(
-        permissions = buildList {
-            add(Manifest.permission.ACCESS_FINE_LOCATION)
-            add(Manifest.permission.ACCESS_COARSE_LOCATION)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-            }
-        }
+    // On Android 11+, Background Location must be requested separately from Foreground
+    val foregroundLocationPermissions = rememberMultiplePermissionsState(
+        permissions = listOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
     )
+
+    val bgLocationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        rememberPermissionState(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+    } else null
 
     Column(
         modifier = Modifier
@@ -187,10 +192,10 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             Button(
                 onClick = {
                     when {
-                        locationPermissions.allPermissionsGranted ->
+                        foregroundLocationPermissions.allPermissionsGranted ->
                             viewModel.captureCurrentLocationAsWork()
 
-                        else -> locationPermissions.launchMultiplePermissionRequest()
+                        else -> foregroundLocationPermissions.launchMultiplePermissionRequest()
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -205,12 +210,31 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 )
             }
 
-            if (!locationPermissions.allPermissionsGranted) {
+            if (!foregroundLocationPermissions.allPermissionsGranted) {
                 Text(
                     "📍 Grant location permission to enable auto work-mode switching.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary
                 )
+            }
+
+            // Warning for missing background location
+            if (foregroundLocationPermissions.allPermissionsGranted && bgLocationPermission?.status?.isGranted == false) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            "Geofencing requires 'Allow all the time' location access to detect when you arrive at work in the background.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Button(
+                            onClick = { bgLocationPermission.launchPermissionRequest() },
+                            modifier = Modifier.padding(top = 8.dp)
+                        ) {
+                            Text("Fix Background Permission")
+                        }
+                    }
+                }
             }
         }
 
@@ -250,9 +274,9 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         // ── Permissions summary ──────────────────────────────────────────────
         SettingsCard(title = "🔐 Permissions", subtitle = null) {
             val perms = listOf(
-                "Location (Fine)" to locationPermissions.allPermissionsGranted,
+                "Location (Fine)" to foregroundLocationPermissions.allPermissionsGranted,
                 "Background Location" to (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
-                        locationPermissions.allPermissionsGranted)
+                        bgLocationPermission?.status?.isGranted == true)
             )
             perms.forEach { (label, granted) ->
                 Row(
@@ -269,7 +293,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 }
             }
 
-            if (!locationPermissions.allPermissionsGranted) {
+            if (!foregroundLocationPermissions.allPermissionsGranted || bgLocationPermission?.status?.isGranted == false) {
                 Spacer(Modifier.height(4.dp))
                 OutlinedButton(
                     onClick = {

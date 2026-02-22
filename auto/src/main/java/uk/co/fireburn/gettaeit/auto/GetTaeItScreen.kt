@@ -78,10 +78,19 @@ class GetTaeItScreen(
             }
         }.build()
 
+        // Add voice action to the header
+        val voiceAction = Action.Builder()
+            .setTitle("🎤 Add Task")
+            .setOnClickListener {
+                screenManager.push(VoiceInputAutoScreen(carContext, viewModel))
+            }
+            .build()
+
         return ListTemplate.Builder()
             .setSingleList(taskList)
             .setTitle(contextualTitle())
             .setHeaderAction(Action.APP_ICON)
+            .addAction(voiceAction) // Registers the mic button in the car UI
             .build()
     }
 }
