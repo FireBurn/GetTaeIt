@@ -55,7 +55,11 @@ class ReminderScheduler @Inject constructor() {
     /** Cancel all alarms for [task]. */
     fun cancelTask(context: Context, task: TaskEntity) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        repeat(task.recurrence.timesPerDay.coerceAtLeast(1)) { slotIndex ->
+        val slotCount = if (task.recurrence.dailySlotMinutes.isNotEmpty())
+            task.recurrence.dailySlotMinutes.size
+        else
+            task.recurrence.timesPerDay.coerceAtLeast(1)
+        repeat(slotCount) { slotIndex ->
             am.cancel(buildPendingIntent(context, task.id.toString(), slotIndex))
         }
     }
@@ -87,22 +91,32 @@ class ReminderScheduler @Inject constructor() {
     /**
      * Computes the epoch-ms trigger time for each daily slot.
      *
-     * If preferredTimeOfDayMinutes is set, that's slot 0.
-     * Additional slots are spaced evenly in the remaining waking window.
+     * Priority order:
+     *   1. [RecurrenceConfig.dailySlotMinutes] — explicit named times (e.g. wake/lunch/dinner/bed).
+     *   2. Even-spread across waking hours based on [RecurrenceConfig.timesPerDay],
+     *      anchored at [RecurrenceConfig.preferredTimeOfDayMinutes] if set.
+     *
      * Slots already past today are pushed to tomorrow.
      */
     private fun computeSlotTimesMs(config: RecurrenceConfig): List<Long> {
-        val n = config.timesPerDay.coerceAtLeast(1)
         val now = Calendar.getInstance()
 
-        // Build slot minutes within the day
-        val slotMinutes: List<Int> = if (n == 1) {
-            listOf(config.preferredTimeOfDayMinutes ?: WAKE_START_MINS)
-        } else {
-            val firstMins = config.preferredTimeOfDayMinutes ?: WAKE_START_MINS
-            val step = WAKE_SPAN_MINS / (n - 1).coerceAtLeast(1)
-            (0 until n).map { i ->
-                (firstMins + i * step).coerceAtMost(WAKE_END_MINS)
+        val slotMinutes: List<Int> = when {
+            // 1. Explicit slot times — use as-is
+            config.dailySlotMinutes.isNotEmpty() -> config.dailySlotMinutes.sorted()
+
+            // 2. Even-spread fallback
+            else -> {
+                val n = config.timesPerDay.coerceAtLeast(1)
+                if (n == 1) {
+                    listOf(config.preferredTimeOfDayMinutes ?: WAKE_START_MINS)
+                } else {
+                    val firstMins = config.preferredTimeOfDayMinutes ?: WAKE_START_MINS
+                    val step = WAKE_SPAN_MINS / (n - 1).coerceAtLeast(1)
+                    (0 until n).map { i ->
+                        (firstMins + i * step).coerceAtMost(WAKE_END_MINS)
+                    }
+                }
             }
         }
 

@@ -379,7 +379,46 @@ class MainViewModel @Inject constructor(
 
     val isParsingVoice = MutableStateFlow(false)
 
-    fun addTasksFromVoice(prompt: String, dueDate: Long? = null, onComplete: () -> Unit = {}) {
+    /**
+     * Holds the AI-inferred recurrence suggestion for the current voice prompt.
+     * Null means the AI found no repeating schedule (one-off task).
+     * Emitted before the "How often?" sheet is shown so the UI can offer it.
+     */
+    private val _voiceScheduleSuggestion = MutableStateFlow<RecurrenceConfig?>(null)
+    val voiceScheduleSuggestion: StateFlow<RecurrenceConfig?> =
+        _voiceScheduleSuggestion.asStateFlow()
+
+    /**
+     * Calls Gemini Nano (or the template fallback) to figure out whether the
+     * voice prompt implies a recurring schedule, then exposes the result via
+     * [voiceScheduleSuggestion].  The caller should await the coroutine (or
+     * collect the flow) before presenting the "How often?" confirmation sheet.
+     */
+    fun parseVoiceForSchedule(prompt: String) {
+        if (prompt.isBlank()) return
+        viewModelScope.launch {
+            isParsingVoice.value = true
+            try {
+                val parsed = hybridTaskService.parsePrompt(prompt).firstOrNull()
+                _voiceScheduleSuggestion.value = parsed?.suggestedRecurrence
+                    ?.takeIf { it.type != RecurrenceType.NONE }
+            } finally {
+                isParsingVoice.value = false
+            }
+        }
+    }
+
+    /** Clear the schedule suggestion once the user has acted on it. */
+    fun clearVoiceScheduleSuggestion() {
+        _voiceScheduleSuggestion.value = null
+    }
+
+    fun addTasksFromVoice(
+        prompt: String,
+        dueDate: Long? = null,
+        recurrenceOverride: RecurrenceConfig? = null,
+        onComplete: () -> Unit = {}
+    ) {
         if (prompt.isBlank()) return
         viewModelScope.launch {
             isParsingVoice.value = true
@@ -391,7 +430,9 @@ class MainViewModel @Inject constructor(
                         appMode.value == AppMode.WORK -> TaskContext.WORK
                         else -> TaskContext.PERSONAL
                     }
-                    val recurrence = parsed.suggestedRecurrence
+                    // Use the user-confirmed override first, then the AI suggestion, then NONE
+                    val recurrence = recurrenceOverride
+                        ?: parsed.suggestedRecurrence
                         ?: RecurrenceConfig(type = RecurrenceType.NONE)
 
                     val parentId = UUID.randomUUID()

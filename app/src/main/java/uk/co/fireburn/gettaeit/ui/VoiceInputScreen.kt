@@ -60,6 +60,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import uk.co.fireburn.gettaeit.shared.data.RecurrenceConfig
+import uk.co.fireburn.gettaeit.shared.data.RecurrenceType
 import uk.co.fireburn.gettaeit.ui.theme.ThistlePurple
 import java.util.Calendar
 
@@ -89,10 +91,33 @@ fun VoiceInputScreen(
     val isParsing by viewModel.isParsingVoice.collectAsState()
     rememberCoroutineScope()
 
-    // "When?" bottom sheet state
-    var showWhenSheet by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Shared pending voice text — set once speech finishes, read by both sheets
     var pendingVoiceText by remember { mutableStateOf("") }
+
+    // AI schedule suggestion from Gemini Nano / template
+    val aiScheduleSuggestion by viewModel.voiceScheduleSuggestion.collectAsState()
+
+    // Which sheet to show — only one is ever visible at a time
+    var showScheduleSheet by remember { mutableStateOf(false) }  // "How often?" (recurring)
+    var showWhenSheet by remember { mutableStateOf(false) }      // "When?" (one-off)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Set true when we fire a parse; prevents the LaunchedEffect routing to a
+    // sheet spuriously on first composition (when isParsing is already false).
+    var awaitingScheduleRoute by remember { mutableStateOf(false) }
+
+    // aiScheduleSuggestion is written before isParsing flips to false in the
+    // ViewModel, so by the time this fires both values are stable.
+    LaunchedEffect(isParsing, aiScheduleSuggestion) {
+        if (awaitingScheduleRoute && !isParsing) {
+            awaitingScheduleRoute = false
+            if (aiScheduleSuggestion != null) {
+                showScheduleSheet = true
+            } else {
+                showWhenSheet = true
+            }
+        }
+    }
 
     val speechRecognizer = remember { SpeechRecognizer.createSpeechRecognizer(context) }
     val recognizerIntent = remember {
@@ -136,9 +161,9 @@ fun VoiceInputScreen(
                     recognizedText = matches[0]
                     editableText = matches[0]
                     hasResult = true
-                    // Show "When?" sheet instead of immediately saving
                     pendingVoiceText = matches[0]
-                    showWhenSheet = true
+                    awaitingScheduleRoute = true
+                    viewModel.parseVoiceForSchedule(matches[0])
                 }
                 isListening = false
             }
@@ -169,7 +194,7 @@ fun VoiceInputScreen(
         animationSpec = infiniteRepeatable(tween(700)), label = "scale"
     )
 
-    // "When?" bottom sheet
+    // "When?" sheet — only shown for tasks Gemini Nano did NOT flag as recurring
     if (showWhenSheet) {
         ModalBottomSheet(
             onDismissRequest = { showWhenSheet = false },
@@ -240,6 +265,109 @@ fun VoiceInputScreen(
                     ) {
                         Text(option.label)
                     }
+                }
+            }
+        }
+    }
+
+    // "How often?" sheet — only shown when Gemini Nano detects a recurring task
+    if (showScheduleSheet && aiScheduleSuggestion != null) {
+        val suggestion = aiScheduleSuggestion!!
+        val scheduleSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+        fun minsToTime(mins: Int): String {
+            val h = mins / 60
+            val m = mins % 60
+            val suffix = if (h < 12) "am" else "pm"
+            val h12 = when {
+                h == 0 -> 12
+                h > 12 -> h - 12
+                else -> h
+            }
+            return if (m == 0) "$h12$suffix" else "$h12:${m.toString().padStart(2, '0')}$suffix"
+        }
+
+        fun humanReadable(cfg: RecurrenceConfig): String = when (cfg.type) {
+            RecurrenceType.DAILY -> when {
+                cfg.dailySlotMinutes.size >= 2 ->
+                    "Every day at ${
+                        cfg.dailySlotMinutes.sorted().joinToString(", ") { minsToTime(it) }
+                    }"
+
+                cfg.timesPerDay >= 2 -> "Every day, ${cfg.timesPerDay} times a day"
+                cfg.interval == 1 -> "Every day"
+                else -> "Every ${cfg.interval} days"
+            }
+
+            RecurrenceType.WEEKLY -> if (cfg.interval == 1) "Every week" else "Every ${cfg.interval} weeks"
+            RecurrenceType.MONTHLY -> if (cfg.interval == 1) "Every month" else "Every ${cfg.interval} months"
+            RecurrenceType.CUSTOM_DAYS -> "On specific days"
+            RecurrenceType.NONE -> "Just once"
+        }
+
+        ModalBottomSheet(
+            onDismissRequest = {
+                showScheduleSheet = false
+                viewModel.clearVoiceScheduleSuggestion()
+                viewModel.addTasksFromVoice(
+                    pendingVoiceText,
+                    recurrenceOverride = RecurrenceConfig(type = RecurrenceType.NONE)
+                ) { onNavigateBack() }
+            },
+            sheetState = scheduleSheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .padding(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "🤖 Gemini reckons this repeats",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    "\"$pendingVoiceText\"",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Suggested schedule: ${humanReadable(suggestion)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ThistlePurple
+                )
+
+                Spacer(Modifier.height(4.dp))
+
+                Button(
+                    onClick = {
+                        showScheduleSheet = false
+                        viewModel.clearVoiceScheduleSuggestion()
+                        viewModel.addTasksFromVoice(
+                            pendingVoiceText,
+                            recurrenceOverride = suggestion
+                        ) { onNavigateBack() }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = ThistlePurple)
+                ) {
+                    Text("✅  Aye, ${humanReadable(suggestion).lowercase()}")
+                }
+
+                Button(
+                    onClick = {
+                        showScheduleSheet = false
+                        viewModel.clearVoiceScheduleSuggestion()
+                        // Fall through to "When?" for a one-off date
+                        showWhenSheet = true
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                ) {
+                    Text("Naw, just the once")
                 }
             }
         }
@@ -347,7 +475,9 @@ fun VoiceInputScreen(
                     Button(
                         onClick = {
                             pendingVoiceText = editableText
-                            showWhenSheet = true
+                            viewModel.clearVoiceScheduleSuggestion()
+                            awaitingScheduleRoute = true
+                            viewModel.parseVoiceForSchedule(editableText)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = ThistlePurple)

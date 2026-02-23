@@ -109,56 +109,120 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
         }
     }
 
+    // ── Named-time anchors (minutes since midnight) ─────────────────────────
+    private val WAKE_UP = 7 * 60   // 07:00
+    private val MID_MORN = 9 * 60   // 09:00
+    private val LUNCH = 13 * 60  // 13:00
+    private val AFTERNOON = 15 * 60  // 15:00
+    private val EVENING = 18 * 60  // 18:00
+    private val NIGHT = 21 * 60  // 21:00
+
+    private fun cleanTitle(raw: String): String = raw
+        .replace(
+            Regex(
+                """(every\s+)?(morning\s+and\s+(night|evening)|morning|night|evening|twice\s+a\s+day|twice\s+daily|2\s+times\s+a\s+day|when\s+i\s+(wake|get)\s+up|wake[\s-]?up|first\s+thing|at\s+lunch(time)?|midday|noon|with\s+dinner|at\s+dinner(time)?|dinnertime|before\s+bed(time)?|at\s+night|night\s+time|go(ing)?\s+to\s+(sleep|bed)|mid[\s-]?morning|in\s+the\s+(afternoon|evening))""",
+                RegexOption.IGNORE_CASE
+            ), ""
+        )
+        .trim()
+        .trimEnd(',', ';', '-', '.')
+        .trim()
+        .replaceFirstChar { it.uppercase() }
+        .ifBlank { raw.trim().replaceFirstChar { it.uppercase() } }
+
+    private fun multiSlotConfig(slots: List<Int>): RecurrenceConfig = RecurrenceConfig(
+        type = RecurrenceType.DAILY,
+        missedBehaviour = MissedBehaviour.IGNORABLE,
+        timesPerDay = slots.size,
+        dailySlotMinutes = slots
+    )
+
     override suspend fun parsePrompt(prompt: String): List<ParsedTask> {
         val p = prompt.lowercase()
 
-        val morningAndNight = ("morning" in p && ("night" in p || "evening" in p)) ||
-                "twice a day" in p || "twice daily" in p || "2 times a day" in p
+        // ── Named-time slot detection ─────────────────────────────────────────
+        // Build an explicit list of minute-of-day values from any time-of-day
+        // phrases the user mentioned. These map directly to alarm times.
+        val namedSlots = mutableListOf<Int>()
 
-        if (morningAndNight) {
-            val taskTitle = prompt
-                .replace(
-                    Regex(
-                        "every\\s+(morning\\s+and\\s+(?:night|evening)|morning|night|evening|twice\\s+a\\s+day|twice\\s+daily)",
-                        RegexOption.IGNORE_CASE
-                    ), ""
-                )
-                .replace(
-                    Regex(
-                        "twice\\s+a\\s+day|twice\\s+daily|2\\s+times\\s+a\\s+day",
-                        RegexOption.IGNORE_CASE
-                    ), ""
-                )
-                .trim()
-                .replaceFirstChar { it.uppercase() }
-                .ifBlank { prompt.trim().replaceFirstChar { it.uppercase() } }
+        // Detect each anchor — order doesn't matter, list is sorted later
+        if (Regex("""(when i (wake|get) up|wake[- ]?up|first thing|get up|morning)""").containsMatchIn(
+                p
+            )
+        )
+            namedSlots += WAKE_UP
+        if ("mid morning" in p || "mid-morning" in p) namedSlots += MID_MORN
+        if (Regex("""(lunch|lunchtime|midday|noon|12 o)""").containsMatchIn(p))
+            namedSlots += LUNCH
+        if ("afternoon" in p) namedSlots += AFTERNOON
+        if (Regex("""(evening|with dinner|at dinner|dinner time|dinnertime)""").containsMatchIn(p))
+            namedSlots += EVENING
+        if (Regex("""(before bed|bedtime|bed time|at night|night time|go to sleep|going? to bed)""").containsMatchIn(
+                p
+            )
+        )
+            namedSlots += NIGHT
 
-            val isTeeth = "teeth" in p || "brush" in p
-            val estMins = if (isTeeth) 3 else null
+        // "twice a day" / "morning and night" without specific names → morning + night
+        val twiceADay = "twice a day" in p || "twice daily" in p || "2 times a day" in p
+        val morningAndNight = "morning" in p && ("night" in p || "evening" in p)
+        if ((twiceADay || morningAndNight) && namedSlots.size < 2) {
+            namedSlots.clear()
+            namedSlots += WAKE_UP
+            namedSlots += NIGHT
+        }
 
+        // Deduplicate and sort
+        val distinctSlots = namedSlots.distinct().sorted()
+
+        // ── 3+ explicit slots (e.g. "4 times a day" or 4+ named anchors) ──────
+        if (distinctSlots.size >= 3) {
+            val title = cleanTitle(prompt)
             return listOf(
                 ParsedTask(
-                    title = "$taskTitle 🌅",
+                    title = title,
                     suggestedContext = detectContext(prompt),
-                    estimatedMinutes = estMins,
-                    suggestedRecurrence = RecurrenceConfig(
-                        type = RecurrenceType.DAILY,
-                        missedBehaviour = MissedBehaviour.IGNORABLE,
-                        preferredTimeOfDayMinutes = 8 * 60
-                    )
-                ),
-                ParsedTask(
-                    title = "$taskTitle 🌙",
-                    suggestedContext = detectContext(prompt),
-                    estimatedMinutes = estMins,
-                    suggestedRecurrence = RecurrenceConfig(
-                        type = RecurrenceType.DAILY,
-                        missedBehaviour = MissedBehaviour.IGNORABLE,
-                        preferredTimeOfDayMinutes = 21 * 60
-                    )
+                    estimatedMinutes = 2,
+                    suggestedRecurrence = multiSlotConfig(distinctSlots)
                 )
             )
         }
+
+        // ── 2 explicit slots (morning + night, twice a day, etc.) ─────────────
+        if (distinctSlots.size == 2) {
+            val title = cleanTitle(prompt)
+            return listOf(
+                ParsedTask(
+                    title = title,
+                    suggestedContext = detectContext(prompt),
+                    estimatedMinutes = 2,
+                    suggestedRecurrence = multiSlotConfig(distinctSlots)
+                )
+            )
+        }
+
+        // ── "3 times a day" / "3x a day" without named anchors ───────────────
+        val timesRegex = Regex("""(\d+)\s*(times?|x)\s*(a|per)\s*(day|daily)""")
+        val timesMatch = timesRegex.find(p)
+        if (timesMatch != null) {
+            val n = timesMatch.groupValues[1].toIntOrNull() ?: 1
+            if (n in 2..8) {
+                // Spread evenly across waking hours 07:00-22:00
+                val span = 15 * 60  // 900 mins
+                val step = span / (n - 1).coerceAtLeast(1)
+                val evenSlots = (0 until n).map { i -> (WAKE_UP + i * step).coerceAtMost(22 * 60) }
+                return listOf(
+                    ParsedTask(
+                        title = cleanTitle(prompt),
+                        suggestedContext = detectContext(prompt),
+                        estimatedMinutes = 2,
+                        suggestedRecurrence = multiSlotConfig(evenSlots)
+                    )
+                )
+            }
+        }
+
+        // ── Single slot — all the original patterns below ─────────────────────
 
         if ("brush teeth" in p || "brush my teeth" in p || "teeth" in p) {
             return listOf(
@@ -169,7 +233,7 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
                     suggestedRecurrence = RecurrenceConfig(
                         type = RecurrenceType.DAILY,
                         missedBehaviour = MissedBehaviour.IGNORABLE,
-                        preferredTimeOfDayMinutes = 8 * 60
+                        preferredTimeOfDayMinutes = WAKE_UP
                     )
                 )
             )
@@ -192,7 +256,7 @@ class TemplateStrategy @Inject constructor() : TaskBreakerStrategy {
                     suggestedRecurrence = RecurrenceConfig(
                         type = RecurrenceType.DAILY,
                         missedBehaviour = MissedBehaviour.IGNORABLE,
-                        preferredTimeOfDayMinutes = 8 * 60
+                        preferredTimeOfDayMinutes = WAKE_UP
                     )
                 )
             )
@@ -342,14 +406,11 @@ class GeminiNanoStrategy @Inject constructor(
         return try {
             val model = Generation.getClient()
 
-            // Using plain text delimited by pipe. Extremely resilient to LLM cutoff.
             val promptText = """
-                List max 3 steps to complete this task: "$prompt"
-                Output each step on a new line using EXACTLY this format: Title|Minutes
-                Example:
-                Clear the desk|5
-                Wipe surfaces|10
-                
+                Task: "$prompt"
+                Only break a task into steps if it has multiple distinct stages (e.g. clean the house, write a report, do the shopping). Single-action tasks (e.g. brush teeth, take medication, make a call) need no steps — output nothing for them.
+                If steps are needed, list max 4 on separate lines using EXACTLY this format: Title|Minutes
+                Example: Clear the desk|5
                 Do not output any markdown, intro, or extra text.
             """.trimIndent()
 
@@ -387,20 +448,20 @@ class GeminiNanoStrategy @Inject constructor(
         }
     }
 
+    // ── Named-time anchors (minutes since midnight) ─────────────────────────
     override suspend fun parsePrompt(prompt: String): List<ParsedTask> {
         Log.i(TAG, "Parsing voice prompt locally via ML Kit...")
         return try {
             val model = Generation.getClient()
 
-            // Using plain text structure to completely avoid JSON decoding crashes
             val promptText = """
-                Extract 1 main task and max 10 subtasks from the request and estimate the time in minutes: "$prompt"
-                Output EXACTLY in this format on separate lines:
-                MAIN: Task Title|30
-                SUB: Step one|10
-                SUB: Step two|20
-                
-                Do not output any markdown or intro text.
+                Task: "$prompt"
+                Only break a task into steps if it has multiple distinct stages (e.g. clean the house, write a report, do the shopping). Single-action tasks (e.g. brush teeth, take medication, make a call) need no steps — output nothing for them.
+                Output EXACTLY in this format:
+                MAIN: Task Title|Minutes
+                SUB: Step one|Minutes
+                SUB: Step two|Minutes
+                Omit all SUB lines if the task is simple. Do not output any markdown or intro text.
             """.trimIndent()
 
             val response = model.generateContent(promptText)
@@ -448,9 +509,9 @@ class GeminiNanoStrategy @Inject constructor(
                 }
             }
 
-            // Borrow the reliable template rules for scheduled repeating tasks
+            // Let the template decide recurrence — it reliably handles all patterns
+            // including explicit named-time slots (dailySlotMinutes).
             val templateRule = templateFallback.parsePrompt(prompt).firstOrNull()
-
             listOf(
                 ParsedTask(
                     title = mainTitle,

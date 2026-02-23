@@ -40,10 +40,17 @@ data class RecurrenceConfig(
     /**
      * How many times per day to remind. Default 1.
      * e.g. 2 = morning + evening, 4 = morning/lunch/evening/bedtime.
-     * Alarms are spread evenly across waking hours (07:00–22:00).
-     * Each instance is IGNORABLE — miss it and it's gone until the next slot.
+     * When [dailySlotMinutes] is non-empty this field is ignored — the explicit
+     * slots take precedence. Used only as a fallback for even-spacing.
      */
-    val timesPerDay: Int = 1
+    val timesPerDay: Int = 1,
+    /**
+     * Explicit per-slot times (minutes since midnight), one entry per alarm.
+     * When non-empty these are used directly instead of even-spacing.
+     * e.g. listOf(7*60, 13*60, 18*60, 22*60) = wake / lunch / dinner / bedtime.
+     * Populated by voice parsing when the user names specific times of day.
+     */
+    val dailySlotMinutes: List<Int> = emptyList()
 )
 
 // ─── Task Entity ──────────────────────────────────────────────────────────────
