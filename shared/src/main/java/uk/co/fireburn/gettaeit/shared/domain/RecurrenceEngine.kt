@@ -63,6 +63,13 @@ class RecurrenceEngine @Inject constructor() {
                 // Find the next day-of-week in the list
                 val todayDow = cal.get(Calendar.DAY_OF_WEEK)
                 val sorted = config.daysOfWeek.sorted()
+                // A partially configured custom recurrence should never crash the
+                // reminder worker. Treat it as a daily recurrence until the user
+                // selects days in the editor.
+                if (sorted.isEmpty()) {
+                    cal.add(Calendar.DAY_OF_YEAR, config.interval)
+                    return applyPreferredTime(cal, config)
+                }
                 val nextDow = sorted.firstOrNull { it > todayDow } ?: sorted.first()
                 var daysAhead = nextDow - todayDow
                 if (daysAhead <= 0) daysAhead += 7
@@ -74,6 +81,10 @@ class RecurrenceEngine @Inject constructor() {
         }
 
         // Snap to preferred time of day if set
+        return applyPreferredTime(cal, config)
+    }
+
+    private fun applyPreferredTime(cal: Calendar, config: RecurrenceConfig): Long {
         config.preferredTimeOfDayMinutes?.let { mins ->
             cal.set(Calendar.HOUR_OF_DAY, mins / 60)
             cal.set(Calendar.MINUTE, mins % 60)
@@ -98,6 +109,10 @@ class RecurrenceEngine @Inject constructor() {
             RecurrenceType.CUSTOM_DAYS -> {
                 // For PERSISTENT + CUSTOM_DAYS: advance to the next matching day from completion
                 val sorted = config.daysOfWeek.sorted()
+                if (sorted.isEmpty()) {
+                    cal.add(Calendar.DAY_OF_YEAR, config.interval)
+                    return applyPreferredTime(cal, config)
+                }
                 val todayDow = cal.get(Calendar.DAY_OF_WEEK)
                 val nextDow = sorted.firstOrNull { it > todayDow } ?: sorted.first()
                 var daysAhead = nextDow - todayDow
@@ -109,14 +124,7 @@ class RecurrenceEngine @Inject constructor() {
             }
         }
 
-        config.preferredTimeOfDayMinutes?.let { mins ->
-            cal.set(Calendar.HOUR_OF_DAY, mins / 60)
-            cal.set(Calendar.MINUTE, mins % 60)
-            cal.set(Calendar.SECOND, 0)
-            cal.set(Calendar.MILLISECOND, 0)
-        }
-
-        return cal.timeInMillis
+        return applyPreferredTime(cal, config)
     }
 
     /**

@@ -1,3 +1,4 @@
 <resources>
-    <string name="default_web_client_id">YOUR_WEB_CLIENT_ID</string>
+    <string name="work_tasks_widget_description">Your next work tasks</string>
+    <string name="personal_tasks_widget_description">Your next personal tasks</string>
 </resources>

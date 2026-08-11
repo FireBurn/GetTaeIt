@@ -33,6 +33,30 @@
         </activity>
 
         <receiver
+            android:name=".widgets.WorkTasksWidgetReceiver"
+            android:exported="true"
+            android:label="Get Tae It · Work">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/work_tasks_widget" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.PersonalTasksWidgetReceiver"
+            android:exported="true"
+            android:label="Get Tae It · Personal">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/personal_tasks_widget" />
+        </receiver>
+
+        <receiver
             android:name="uk.co.fireburn.gettaeit.shared.GeofenceBroadcastReceiver"
             android:exported="true" />
 

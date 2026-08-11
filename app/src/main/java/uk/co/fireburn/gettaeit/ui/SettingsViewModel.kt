@@ -107,4 +107,12 @@ class SettingsViewModel @Inject constructor(
             userPreferencesRepository.updateUserPreferences(updated)
         }
     }
+
+    fun setVacationMode(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.updateUserPreferences(
+                userPreferences.first().copy(isVacationMode = enabled)
+            )
+        }
+    }
 }

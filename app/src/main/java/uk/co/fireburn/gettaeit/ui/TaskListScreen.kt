@@ -1,5 +1,7 @@
 package uk.co.fireburn.gettaeit.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +40,10 @@ import androidx.compose.material.icons.filled.Snooze
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.Work
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -57,54 +62,96 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import uk.co.fireburn.gettaeit.R
 import uk.co.fireburn.gettaeit.shared.data.RecurrenceType
 import uk.co.fireburn.gettaeit.shared.data.TaskContext
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 import uk.co.fireburn.gettaeit.shared.domain.AppMode
+import uk.co.fireburn.gettaeit.shared.domain.DependencyGraph
 import uk.co.fireburn.gettaeit.shared.domain.RecurrenceEngine
+import uk.co.fireburn.gettaeit.shared.domain.TaskNowFilter
+import uk.co.fireburn.gettaeit.ui.theme.MonoLabelStyle
 
-private val WorkPrimary = Color(0xFF0065BD)
-private val PersonalPrimary = Color(0xFF8D5CA5)
+/** Personal tasks read as thistle, work tasks as loch — same trio as the rest of the app. */
+private val AppMode.contextAccent: androidx.compose.ui.graphics.Color
+    @Composable get() = when (this) {
+        AppMode.WORK -> MaterialTheme.colorScheme.secondary
+        AppMode.PERSONAL -> MaterialTheme.colorScheme.primary
+        AppMode.COMMUTE -> MaterialTheme.colorScheme.tertiary
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskListScreen(
     viewModel: MainViewModel = hiltViewModel(),
     recurrenceEngine: RecurrenceEngine = hiltViewModel<MainViewModel>().let { RecurrenceEngine() },
-    onAddTaskClicked: () -> Unit
+    onAddTaskClicked: () -> Unit,
+    onGoblinModeClicked: () -> Unit,
+    onWeeklyReviewClicked: () -> Unit
 ) {
     val tasks by viewModel.tasks.collectAsState()
     val appMode by viewModel.appMode.collectAsState()
     val allTasks by viewModel.allTasks.collectAsState()
-
-    val unblocksCount = remember(allTasks) {
-        val map = mutableMapOf<java.util.UUID, Int>()
-        allTasks.forEach { t ->
-            t.dependencyIds.forEach { depId ->
-                map[depId] = (map[depId] ?: 0) + 1
-            }
-        }
-        map
+    val completedToday by viewModel.completedToday.collectAsState()
+    val completionCelebration by viewModel.completionCelebration.collectAsState()
+    var availableMinutes by rememberSaveable { mutableStateOf<Int?>(null) }
+    var lowEnergyOnly by rememberSaveable { mutableStateOf(false) }
+    val visibleTasks = remember(tasks, availableMinutes, lowEnergyOnly) {
+        TaskNowFilter.filter(tasks, availableMinutes, lowEnergyOnly)
     }
+
+    // Direct + transitive: a task blocking a chain of three outranks one blocking a single task.
+    val unblocksCount = remember(allTasks) {
+        allTasks.associate { it.id to DependencyGraph.transitiveUnblockCount(it.id, allTasks) }
+    }
+
+    // Best currently-active streak, for a wee bit of bragging rights in the header.
+    val bestStreak = remember(tasks) { tasks.maxOfOrNull { it.streakCount } ?: 0 }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars) // Push content below the status bar!
     ) {
+        BrandHeader(
+            streak = bestStreak,
+            onGoblinModeClicked = onGoblinModeClicked,
+            onWeeklyReviewClicked = onWeeklyReviewClicked
+        )
         ContextBanner(mode = appMode)
-        if (tasks.isEmpty()) {
+        completionCelebration?.let { celebration ->
+            CompletionCelebrationCard(
+                celebration = celebration,
+                onDismiss = viewModel::clearCompletionCelebration
+            )
+        }
+        WinsSummary(
+            completedCount = completedToday.size,
+            totalXp = completedToday.sumOf { it.xpValue },
+            bestStreak = bestStreak
+        )
+        TaskNowFilterBar(
+            availableMinutes = availableMinutes,
+            lowEnergyOnly = lowEnergyOnly,
+            onMinutesChanged = { availableMinutes = it },
+            onLowEnergyChanged = { lowEnergyOnly = it }
+        )
+        if (visibleTasks.isEmpty()) {
             EmptyState(mode = appMode)
         } else {
             LazyColumn(
@@ -112,7 +159,7 @@ fun TaskListScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(tasks, key = { it.id }) { task ->
+                items(visibleTasks, key = { it.id }) { task ->
                     TaskGroup(
                         task = task,
                         recurrenceEngine = recurrenceEngine,
@@ -137,56 +184,188 @@ fun TaskListScreen(
     }
 }
 
+@Composable
+private fun CompletionCelebrationCard(
+    celebration: CompletionCelebration,
+    onDismiss: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Nice — +${celebration.xp} XP for ${celebration.taskTitle}", modifier = Modifier.weight(1f))
+            TextButton(onClick = onDismiss) { Text("Got it") }
+        }
+    }
+}
+
+@Composable
+private fun WinsSummary(completedCount: Int, totalXp: Int, bestStreak: Int) {
+    if (completedCount == 0 && bestStreak < 2) return
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            Text(
+                text = if (completedCount == 1) "One win today · $totalXp XP" else "$completedCount wins today · $totalXp XP",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (bestStreak > 1) {
+                Text(
+                    "Routine streak ×$bestStreak. A day off is allowed — life happens.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskNowFilterBar(
+    availableMinutes: Int?,
+    lowEnergyOnly: Boolean,
+    onMinutesChanged: (Int?) -> Unit,
+    onLowEnergyChanged: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        listOf(10, 20, 45).forEach { minutes ->
+            AssistChip(
+                onClick = { onMinutesChanged(if (availableMinutes == minutes) null else minutes) },
+                label = { Text("$minutes min") }
+            )
+        }
+        AssistChip(
+            onClick = { onLowEnergyChanged(!lowEnergyOnly) },
+            label = { Text(if (lowEnergyOnly) "Low energy ✓" else "Low energy") }
+        )
+    }
+}
+
+// ─── Brand header ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun BrandHeader(
+    streak: Int,
+    onGoblinModeClicked: () -> Unit,
+    onWeeklyReviewClicked: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Image(
+                painter = painterResource(R.drawable.coo_mark),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(50))
+            )
+            Text(
+                "Get Tae It",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onWeeklyReviewClicked) {
+                Icon(
+                    Icons.Filled.CalendarMonth,
+                    contentDescription = "Open weekly review",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            IconButton(onClick = onGoblinModeClicked) {
+                Icon(
+                    Icons.Filled.Visibility,
+                    contentDescription = "Enter Goblin Mode",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            if (streak > 1) Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    Icons.Filled.LocalFireDepartment,
+                    contentDescription = "Best streak",
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    "×$streak",
+                    style = MonoLabelStyle,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
+        }
+    }
+}
+
 // ─── Context banner ───────────────────────────────────────────────────────────
 
 @Composable
 private fun ContextBanner(mode: AppMode) {
-    val (icon, label, sub, accent) = when (mode) {
-        AppMode.WORK -> Quad(Icons.Filled.Work, "Work Mode", "Showing your work tasks", WorkPrimary)
-        AppMode.PERSONAL -> Quad(
-            Icons.Filled.Home,
-            "Home Mode",
-            "Your personal tasks",
-            PersonalPrimary
-        )
-
-        AppMode.COMMUTE -> Quad(
+    val accent = mode.contextAccent
+    val (icon, label, sub) = when (mode) {
+        AppMode.WORK -> Triple(Icons.Filled.Work, "Work Mode", "Showing your work tasks")
+        AppMode.PERSONAL -> Triple(Icons.Filled.Home, "Home Mode", "Your personal tasks")
+        AppMode.COMMUTE -> Triple(
             Icons.Filled.DirectionsCar,
             "On The Move",
-            "Top 3 tasks for the road",
-            Color(0xFFE65100)
+            "Top 3 tasks for the road"
         )
     }
     Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .background(accent.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(accent.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     icon,
                     contentDescription = null,
                     tint = accent,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
             Column {
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    sub, style = MaterialTheme.typography.labelSmall,
+                    sub, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
@@ -243,7 +422,9 @@ fun TaskGroupStateful(
         viewModel.getSubtasks(task.id)
     }.collectAsState(initial = emptyList())
 
-    val accent = if (task.context == TaskContext.WORK) WorkPrimary else PersonalPrimary
+    val accent =
+        if (task.context == TaskContext.WORK) MaterialTheme.colorScheme.secondary
+        else MaterialTheme.colorScheme.primary
     val blockers =
         task.dependencyIds.mapNotNull { depId -> allTasks.firstOrNull { it.id == depId } }
     val isBlocked = blockers.any { !it.isCompleted }
@@ -380,16 +561,22 @@ private fun ParentFooterCard(
     onEdit: () -> Unit = {}
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val errorColor = MaterialTheme.colorScheme.error
+    val tertiary = MaterialTheme.colorScheme.tertiary
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(
-            topStart = if (totalCount > 0) 0.dp else 14.dp,
-            topEnd = if (totalCount > 0) 0.dp else 14.dp,
-            bottomStart = 14.dp,
-            bottomEnd = 14.dp
+            topStart = if (totalCount > 0) 0.dp else 17.dp,
+            topEnd = if (totalCount > 0) 0.dp else 17.dp,
+            bottomStart = 17.dp,
+            bottomEnd = 17.dp
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        border = if (unblocksCount > 0 && !isBlocked) BorderStroke(
+            1.dp,
+            tertiary.copy(alpha = 0.4f)
+        ) else null,
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isBlocked) 0.dp else 2.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isBlocked)
                 MaterialTheme.colorScheme.surfaceVariant
@@ -397,35 +584,53 @@ private fun ParentFooterCard(
                 MaterialTheme.colorScheme.surface
         )
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (isBlocked) Modifier.alpha(0.72f) else Modifier)
+        ) {
             Box(
                 modifier = Modifier
                     .width(5.dp)
                     .height(if (totalCount > 0) 64.dp else 72.dp)
                     .background(
                         if (isBlocked) accent.copy(alpha = 0.3f) else accent,
-                        RoundedCornerShape(bottomStart = 14.dp)
+                        RoundedCornerShape(bottomStart = 17.dp)
                     )
             )
 
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                    .padding(start = 14.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
                         text = task.title,
-                        style = if (totalCount > 0) MaterialTheme.typography.bodyMedium
-                        else MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
+                        style = if (totalCount > 0) MaterialTheme.typography.titleSmall
+                        else MaterialTheme.typography.titleMedium,
                         color = if (isBlocked) MaterialTheme.colorScheme.onSurfaceVariant
                         else MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
+                    // The one bold element on the card — everything else stays quiet.
+                    if (unblocksCount > 0 && !isBlocked) {
+                        UnlocksBadge(count = unblocksCount, color = tertiary)
+                    }
+                    if (isBlocked) {
+                        Icon(
+                            Icons.Filled.Lock,
+                            contentDescription = "Blocked",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
 
                 if (totalCount > 0) {
@@ -444,7 +649,7 @@ private fun ParentFooterCard(
                         )
                         Text(
                             "$doneCount/$totalCount",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MonoLabelStyle,
                             color = accent,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -462,7 +667,7 @@ private fun ParentFooterCard(
                         )
                     }
                     if (task.priority <= 2) {
-                        MetaChip(Icons.Filled.PriorityHigh, "Urgent", Color(0xFFD32F2F))
+                        MetaChip(Icons.Filled.PriorityHigh, "Urgent", errorColor)
                     }
                     task.estimatedMinutes?.let { mins ->
                         if (totalCount == 0) MetaChip(
@@ -471,25 +676,11 @@ private fun ParentFooterCard(
                             accent
                         )
                     }
-                    if (unblocksCount > 0) {
-                        MetaChip(
-                            Icons.Filled.Key,
-                            "Unblocks $unblocksCount",
-                            Color(0xFF2E7D32)
-                        )
-                    }
-                    if (isBlocked) {
-                        MetaChip(
-                            Icons.Filled.Lock,
-                            "Blocked by ${blockers.count { !it.isCompleted }}",
-                            Color(0xFFE65100)
-                        )
-                    }
                     if (task.streakCount > 1) {
                         MetaChip(
                             Icons.Filled.LocalFireDepartment,
                             "×${task.streakCount}",
-                            Color(0xFFFF6F00)
+                            tertiary
                         )
                     }
                 }
@@ -498,9 +689,9 @@ private fun ParentFooterCard(
                     val blockerNames =
                         blockers.filter { !it.isCompleted }.joinToString(" · ") { it.title }
                     Text(
-                        "Waiting on: $blockerNames",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFFE65100).copy(alpha = 0.8f),
+                        "Waiting on $blockerNames",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -536,7 +727,7 @@ private fun ParentFooterCard(
                             Icon(
                                 Icons.Filled.Delete,
                                 null,
-                                tint = Color(0xFFD32F2F)
+                                tint = MaterialTheme.colorScheme.error
                             )
                         },
                         onClick = { onDelete(); showMenu = false }
@@ -602,7 +793,36 @@ private fun MetaChip(
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         Icon(icon, null, modifier = Modifier.size(10.dp), tint = tint)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = tint)
+        Text(label, style = MonoLabelStyle, fontSize = 10.5.sp, color = tint)
+    }
+}
+
+// ─── Unlocks badge ────────────────────────────────────────────────────────────
+// The one loud element on a card — a task holding up N others jumps the queue,
+// and this is why. Everything else on the card stays quiet by comparison.
+
+@Composable
+private fun UnlocksBadge(count: Int, color: Color) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(color)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            Icons.Filled.Key,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(12.dp)
+        )
+        Text(
+            "Unlocks $count",
+            style = MaterialTheme.typography.labelLarge,
+            fontSize = 12.sp,
+            color = Color.White
+        )
     }
 }
 
@@ -645,10 +865,3 @@ fun formatMinutes(minutes: Int): String = when {
     minutes % 60 == 0 -> "${minutes / 60}h"
     else -> "${minutes / 60}h ${minutes % 60}m"
 }
-
-private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
-
-private operator fun <A, B, C, D> Quad<A, B, C, D>.component1() = a
-private operator fun <A, B, C, D> Quad<A, B, C, D>.component2() = b
-private operator fun <A, B, C, D> Quad<A, B, C, D>.component3() = c
-private operator fun <A, B, C, D> Quad<A, B, C, D>.component4() = d

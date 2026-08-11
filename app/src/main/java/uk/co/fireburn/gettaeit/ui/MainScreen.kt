@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -17,11 +18,14 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -29,16 +33,32 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import uk.co.fireburn.gettaeit.ui.navigation.Screen
-import uk.co.fireburn.gettaeit.ui.theme.ThistlePurple
 
 @Composable
 fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
     val navController = rememberNavController()
+    val isGoblinMode by viewModel.isGoblinMode.collectAsState()
+    val tasks by viewModel.tasks.collectAsState()
+    val focusSession by viewModel.focusSession.collectAsState()
+    var showQuickCapture by rememberSaveable { mutableStateOf(false) }
     val navItems = listOf(
         Screen.TaskList,
         Screen.KitchenDashboard,
         Screen.Settings
     )
+
+    if (isGoblinMode) {
+        GoblinModeScreen(
+            task = tasks.firstOrNull(),
+            focusSession = focusSession,
+            onComplete = viewModel::completeTask,
+            onSnooze = viewModel::snoozeTask,
+            onStartFocus = viewModel::startFocusSession,
+            onStopFocus = viewModel::stopFocusSession,
+            onExit = { viewModel.setGoblinMode(false) }
+        )
+        return
+    }
 
     Scaffold(
         floatingActionButton = {
@@ -49,8 +69,8 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
                 // Smaller mic FAB
                 SmallFloatingActionButton(
                     onClick = { navController.navigate("voice_add_task") },
-                    containerColor = ThistlePurple.copy(alpha = 0.85f),
-                    contentColor = Color.White,
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     elevation = FloatingActionButtonDefaults.elevation(6.dp)
                 ) {
                     Icon(
@@ -61,15 +81,12 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
                 }
                 // Primary add FAB
                 FloatingActionButton(
-                    onClick = {
-                        viewModel.cancelEdit() // Clear any existing edit state
-                        navController.navigate("add_task")
-                    },
-                    containerColor = ThistlePurple,
-                    contentColor = Color.White,
+                    onClick = { showQuickCapture = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     elevation = FloatingActionButtonDefaults.elevation(8.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add task")
+                    Icon(Icons.Default.Add, contentDescription = "Quick capture")
                 }
             }
         },
@@ -106,7 +123,9 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
             composable(Screen.TaskList.route) {
                 TaskListScreen(
                     viewModel = viewModel, // Share ViewModel
-                    onAddTaskClicked = { navController.navigate("add_task") }
+                    onAddTaskClicked = { navController.navigate("add_task") },
+                    onGoblinModeClicked = { viewModel.setGoblinMode(true) },
+                    onWeeklyReviewClicked = { navController.navigate("weekly_review") }
                 )
             }
             composable(Screen.KitchenDashboard.route) {
@@ -127,6 +146,31 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
+            composable("weekly_review") {
+                WeeklyReviewScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
         }
+    }
+
+    if (showQuickCapture) {
+        QuickCaptureDialog(
+            onSave = {
+                viewModel.quickCapture(it)
+                showQuickCapture = false
+            },
+            onTemplate = {
+                viewModel.addRoutineTemplate(it)
+                showQuickCapture = false
+            },
+            onPlanInstead = {
+                showQuickCapture = false
+                viewModel.cancelEdit()
+                navController.navigate("add_task")
+            },
+            onDismiss = { showQuickCapture = false }
+        )
     }
 }

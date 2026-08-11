@@ -67,6 +67,8 @@ data class TaskEntity(
 
     // Status
     val isCompleted: Boolean = false,
+    /** Hidden from the daily plan but retained locally and in backup for later restoration. */
+    val isArchived: Boolean = false,
     val completedAt: Long? = null,               // epoch ms of last completion
     val isSnoozed: Boolean = false,
     val snoozedUntil: Long? = null,              // epoch ms; null = not snoozed

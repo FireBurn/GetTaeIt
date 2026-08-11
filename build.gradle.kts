@@ -6,6 +6,19 @@ plugins {
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.hilt.android) apply false
     alias(libs.plugins.ksp) apply false
+    // Applied conditionally in :app, once google-services.json exists — see there.
+    alias(libs.plugins.google.services) apply false
+}
+
+// Dagger/Hilt 2.59.2 bundles a kotlin-metadata-jvm that can't parse Kotlin 2.4.0
+// metadata. It's unshaded since Dagger 2.57, so force the matching version here
+// rather than pin the whole project back to an older Kotlin.
+subprojects {
+    configurations.all {
+        resolutionStrategy {
+            force("org.jetbrains.kotlin:kotlin-metadata-jvm:${libs.versions.kotlinMetadataJvm.get()}")
+        }
+    }
 }
 
 // Clean task

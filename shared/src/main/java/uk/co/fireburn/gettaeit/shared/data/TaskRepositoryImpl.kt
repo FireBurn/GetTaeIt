@@ -4,9 +4,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import uk.co.fireburn.gettaeit.shared.domain.AppMode
 import uk.co.fireburn.gettaeit.shared.domain.ContextManager
+import uk.co.fireburn.gettaeit.shared.domain.DependencyGraph
 import uk.co.fireburn.gettaeit.shared.domain.RecurrenceEngine
 import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
 import java.util.UUID
+import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,7 +16,8 @@ import javax.inject.Singleton
 class TaskRepositoryImpl @Inject constructor(
     private val taskDao: TaskDao,
     private val contextManager: ContextManager,
-    private val recurrenceEngine: RecurrenceEngine
+    private val recurrenceEngine: RecurrenceEngine,
+    private val firestoreTaskSync: FirestoreTaskSync
 ) : TaskRepository {
 
     // ─── Active task stream ─────────────────────────────────────────────────
@@ -45,6 +48,22 @@ class TaskRepositoryImpl @Inject constructor(
     override fun getAllActiveToplevelTasks(): Flow<List<TaskEntity>> =
         taskDao.getAllActiveToplevelTasks()
 
+    override fun getCompletedToday(): Flow<List<TaskEntity>> {
+        val startOfToday = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        return taskDao.getCompletedSince(startOfToday)
+    }
+
+    override fun getReviewableTopLevelTasks(): Flow<List<TaskEntity>> =
+        taskDao.getReviewableTopLevelTasks()
+
+    override fun getArchivedTopLevelTasks(): Flow<List<TaskEntity>> =
+        taskDao.getArchivedTopLevelTasks()
+
     override suspend fun autoCompleteParentIfDone(parentId: UUID) {
         val subtasks = taskDao.getAllSubtasks(parentId)
         if (subtasks.isNotEmpty() && subtasks.all { it.isCompleted }) {
@@ -65,16 +84,42 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     // ─── Writes ─────────────────────────────────────────────────────────────
+    // Every mutation lands in Room first and immediately returns — the Firestore mirror
+    // (when signed in) happens fire-and-forget afterwards and never blocks the UI.
 
-    override suspend fun addTask(task: TaskEntity) = taskDao.insert(task)
+    override suspend fun addTask(task: TaskEntity) {
+        taskDao.insert(task)
+        firestoreTaskSync.push(task)
+    }
 
-    override suspend fun addAll(tasks: List<TaskEntity>) = taskDao.insertAll(tasks)
+    override suspend fun addAll(tasks: List<TaskEntity>) {
+        taskDao.insertAll(tasks)
+        tasks.forEach { firestoreTaskSync.push(it) }
+    }
 
-    override suspend fun updateTask(task: TaskEntity) = taskDao.update(task)
+    override suspend fun updateTask(task: TaskEntity) {
+        taskDao.update(task)
+        firestoreTaskSync.push(task)
+    }
 
     override suspend fun deleteTask(task: TaskEntity) {
+        val subtaskIds = taskDao.getAllSubtasks(task.id).map { it.id }
         taskDao.deleteSubtasksOf(task.id)
         taskDao.delete(task)
+        subtaskIds.forEach { firestoreTaskSync.delete(it) }
+        firestoreTaskSync.delete(task.id)
+    }
+
+    override suspend fun archiveTask(task: TaskEntity) {
+        val archived = task.copy(isArchived = true, isSnoozed = false, snoozedUntil = null)
+        taskDao.update(archived)
+        firestoreTaskSync.push(archived)
+    }
+
+    override suspend fun unarchiveTask(task: TaskEntity) {
+        val restored = task.copy(isArchived = false)
+        taskDao.update(restored)
+        firestoreTaskSync.push(restored)
     }
 
     // ─── Completion with recurrence ─────────────────────────────────────────
@@ -94,22 +139,25 @@ class TaskRepositoryImpl @Inject constructor(
             lastStreakDate = now
         )
         taskDao.update(updated)
+        firestoreTaskSync.push(updated)
     }
 
     override suspend fun uncompleteTask(task: TaskEntity) {
-        taskDao.update(
-            task.copy(
-                isCompleted = false,
-                completedAt = null,
-                nextOccurrenceAt = null
-            )
+        val updated = task.copy(
+            isCompleted = false,
+            completedAt = null,
+            nextOccurrenceAt = null
         )
+        taskDao.update(updated)
+        firestoreTaskSync.push(updated)
     }
 
     // ─── Snooze ─────────────────────────────────────────────────────────────
 
     override suspend fun snoozeTask(task: TaskEntity, untilMs: Long) {
-        taskDao.update(task.copy(isSnoozed = true, snoozedUntil = untilMs))
+        val updated = task.copy(isSnoozed = true, snoozedUntil = untilMs)
+        taskDao.update(updated)
+        firestoreTaskSync.push(updated)
     }
 
     // ─── Recurrence reset (called by WorkManager) ───────────────────────────
@@ -118,7 +166,9 @@ class TaskRepositoryImpl @Inject constructor(
         val now = System.currentTimeMillis()
         val due = taskDao.getRecurrencesDue(now)
         due.forEach { task ->
-            taskDao.update(recurrenceEngine.resetForNextOccurrence(task))
+            val updated = recurrenceEngine.resetForNextOccurrence(task)
+            taskDao.update(updated)
+            firestoreTaskSync.push(updated)
         }
     }
 
@@ -141,14 +191,10 @@ class TaskRepositoryImpl @Inject constructor(
      * 5. Fallback: explicit priority, then due date
      */
     private fun List<TaskEntity>.sortedByDisplayOrder(): List<TaskEntity> {
-        map { it.id }.toSet()
-        // Count how many tasks each task blocks (i.e. how many others depend on it)
-        val unblocksCount = mutableMapOf<UUID, Int>()
-        forEach { task ->
-            task.dependencyIds.forEach { depId ->
-                unblocksCount[depId] = (unblocksCount[depId] ?: 0) + 1
-            }
-        }
+        val tasks = this
+        // Direct + transitive count of tasks riding on each task completing —
+        // a task blocking a chain of three counts higher than one blocking a single task.
+        val unblocksCount = associate { it.id to DependencyGraph.transitiveUnblockCount(it.id, tasks) }
         val now = System.currentTimeMillis()
 
         return sortedWith(

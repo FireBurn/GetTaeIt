@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "uk.co.fireburn.gettaeit.wear"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "uk.co.fireburn.gettaeit.wear"
         minSdk = 30
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
         vectorDrawables {
@@ -71,6 +71,7 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
+    annotationProcessor("org.jetbrains.kotlin:kotlin-metadata-jvm:${libs.versions.kotlinMetadataJvm.get()}")
 
     // Lifecycle
     implementation(libs.androidx.lifecycle.runtime.ktx)

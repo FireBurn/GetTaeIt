@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "uk.co.fireburn.gettaeit.shared"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26
@@ -28,6 +28,8 @@ android {
 }
 
 dependencies {
+    testImplementation(libs.junit)
+
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
@@ -48,4 +50,11 @@ dependencies {
 
     // ML Kit GenAI (The stable way to use Nano)
     implementation(libs.mlkit.genai.prompt)
+
+    // Firebase — Auth + Firestore back the optional cloud backup. Firebase.auth /
+    // Firebase.firestore only actually initialise once google-services.json exists
+    // (see :app/build.gradle.kts); AuthRepositoryImpl guards against that being absent.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth.ktx)
+    implementation(libs.firebase.firestore.ktx)
 }

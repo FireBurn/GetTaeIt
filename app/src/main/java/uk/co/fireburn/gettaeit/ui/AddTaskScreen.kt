@@ -52,7 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import uk.co.fireburn.gettaeit.shared.data.MissedBehaviour
 import uk.co.fireburn.gettaeit.shared.data.RecurrenceType
 import uk.co.fireburn.gettaeit.shared.data.TaskContext
@@ -159,13 +159,13 @@ fun AddTaskScreen(
                 ContextChip(
                     label = "🏠 Personal",
                     selected = state.context == TaskContext.PERSONAL,
-                    selectedColor = Color(0xFF8D5CA5),
+                    selectedColor = MaterialTheme.colorScheme.primary,
                     onClick = { viewModel.updateAddTaskState { copy(context = TaskContext.PERSONAL) } }
                 )
                 ContextChip(
                     label = "💼 Work",
                     selected = state.context == TaskContext.WORK,
-                    selectedColor = Color(0xFF0065BD),
+                    selectedColor = MaterialTheme.colorScheme.secondary,
                     onClick = { viewModel.updateAddTaskState { copy(context = TaskContext.WORK) } }
                 )
                 ContextChip(
@@ -226,16 +226,17 @@ fun AddTaskScreen(
             if (allTasks.isNotEmpty()) {
                 SectionLabel("Blocked by (optional)")
                 DependencyPicker(
-                    allTasks = allTasks.filter { it.id != java.util.UUID.fromString("00000000-0000-0000-0000-000000000000") }, // exclude self (title not saved yet)
+                    allTasks = allTasks.filter { it.id != editingTaskId }, // exclude self
                     selectedIds = state.dependencyIds,
-                    onToggle = { id ->
-                        viewModel.updateAddTaskState {
-                            val newDeps =
-                                if (id in dependencyIds) dependencyIds - id else dependencyIds + id
-                            copy(dependencyIds = newDeps)
-                        }
-                    }
+                    onToggle = { id -> viewModel.toggleDependency(id) }
                 )
+                state.dependencyCycleWarning?.let { warning ->
+                    Text(
+                        warning,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
 
             // ── AI subtask suggestions ───────────────────────────────────────
@@ -566,12 +567,13 @@ private fun DependencyPicker(
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         allTasks.forEach { task ->
             val selected = task.id in selectedIds
+            val tint = MaterialTheme.colorScheme.tertiary
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
                     .background(
-                        if (selected) Color(0xFFE65100).copy(alpha = 0.1f)
+                        if (selected) tint.copy(alpha = 0.12f)
                         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     )
                     .clickable { onToggle(task.id) }
@@ -580,15 +582,15 @@ private fun DependencyPicker(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Icon(
-                    if (selected) Icons.Filled.Lock else Icons.Filled.Lock,
+                    Icons.Filled.Lock,
                     contentDescription = null,
-                    tint = if (selected) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (selected) tint else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )
                 Text(
                     task.title,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (selected) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurface,
+                    color = if (selected) tint else MaterialTheme.colorScheme.onSurface,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import uk.co.fireburn.gettaeit.notifications.ReminderScheduler
 import uk.co.fireburn.gettaeit.shared.DataLayerSync
@@ -22,7 +25,9 @@ import uk.co.fireburn.gettaeit.shared.data.TaskContext
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 import uk.co.fireburn.gettaeit.shared.domain.AppMode
 import uk.co.fireburn.gettaeit.shared.domain.ContextManager
+import uk.co.fireburn.gettaeit.shared.domain.DependencyGraph
 import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
+import uk.co.fireburn.gettaeit.shared.domain.RoutineTemplate
 import uk.co.fireburn.gettaeit.shared.domain.ai.HybridTaskService
 import java.util.Calendar
 import java.util.UUID
@@ -41,6 +46,7 @@ data class AddTaskUiState(
     val dueDate: Long? = null,
     val parentId: UUID? = null,
     val dependencyIds: List<UUID> = emptyList(),
+    val dependencyCycleWarning: String? = null,
     val timesPerDay: Int = 1,
     val suggestedSubtasks: List<String> = emptyList(),
     val suggestedSubtaskMinutes: List<Int?> = emptyList(),
@@ -48,6 +54,17 @@ data class AddTaskUiState(
     val existingSubtasks: List<TaskEntity> = emptyList(),
     val isGeneratingSubtasks: Boolean = false
 )
+
+/** The small amount of state needed for an optional, private focus block. */
+data class FocusSessionUiState(
+    val status: FocusSessionStatus = FocusSessionStatus.IDLE,
+    val totalSeconds: Int = 0,
+    val remainingSeconds: Int = 0
+)
+
+enum class FocusSessionStatus { IDLE, RUNNING, COMPLETED }
+
+data class CompletionCelebration(val taskTitle: String, val xp: Int)
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -69,6 +86,96 @@ class MainViewModel @Inject constructor(
 
     val allTasks: StateFlow<List<TaskEntity>> = taskRepository.getAllActiveToplevelTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val completedToday: StateFlow<List<TaskEntity>> = taskRepository.getCompletedToday()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val reviewTasks: StateFlow<List<TaskEntity>> = taskRepository.getReviewableTopLevelTasks()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val archivedTasks: StateFlow<List<TaskEntity>> = taskRepository.getArchivedTopLevelTasks()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _completionCelebration = MutableStateFlow<CompletionCelebration?>(null)
+    val completionCelebration: StateFlow<CompletionCelebration?> = _completionCelebration.asStateFlow()
+
+    fun clearCompletionCelebration() {
+        _completionCelebration.value = null
+    }
+
+    private val _isGoblinMode = MutableStateFlow(false)
+    /** A reversible focus state: show one useful task, not an overwhelming plan. */
+    val isGoblinMode: StateFlow<Boolean> = _isGoblinMode.asStateFlow()
+
+    fun setGoblinMode(enabled: Boolean) {
+        _isGoblinMode.value = enabled
+    }
+
+    private var focusSessionJob: Job? = null
+    private val _focusSession = MutableStateFlow(FocusSessionUiState())
+    /** An optional body-doubling timer. It is local, private, and never changes tasks. */
+    val focusSession: StateFlow<FocusSessionUiState> = _focusSession.asStateFlow()
+
+    fun startFocusSession(minutes: Int) {
+        val totalSeconds = (minutes.coerceIn(1, 90)) * 60
+        val endTimeMs = System.currentTimeMillis() + totalSeconds * 1_000L
+        focusSessionJob?.cancel()
+        _focusSession.value = FocusSessionUiState(
+            status = FocusSessionStatus.RUNNING,
+            totalSeconds = totalSeconds,
+            remainingSeconds = totalSeconds
+        )
+        focusSessionJob = viewModelScope.launch {
+            while (isActive) {
+                val remaining = ((endTimeMs - System.currentTimeMillis() + 999L) / 1_000L)
+                    .toInt().coerceAtLeast(0)
+                if (remaining == 0) {
+                    _focusSession.value = FocusSessionUiState(
+                        status = FocusSessionStatus.COMPLETED,
+                        totalSeconds = totalSeconds
+                    )
+                    break
+                }
+                _focusSession.value = FocusSessionUiState(
+                    status = FocusSessionStatus.RUNNING,
+                    totalSeconds = totalSeconds,
+                    remainingSeconds = remaining
+                )
+                delay(250)
+            }
+        }
+    }
+
+    fun stopFocusSession() {
+        focusSessionJob?.cancel()
+        focusSessionJob = null
+        _focusSession.value = FocusSessionUiState()
+    }
+
+    /**
+     * Low-friction capture for an ADHD brain: save the thought before it
+     * disappears, then let the user organise it later if they want to.
+     */
+    fun quickCapture(title: String) {
+        val cleanedTitle = title.trim()
+        if (cleanedTitle.isEmpty()) return
+        viewModelScope.launch {
+            taskRepository.addTask(
+                TaskEntity(
+                    title = cleanedTitle,
+                    context = TaskContext.ANY,
+                    priority = 3
+                )
+            )
+        }
+    }
+
+    fun addRoutineTemplate(template: RoutineTemplate) {
+        viewModelScope.launch {
+            taskRepository.addAll(template.steps.map { step ->
+                TaskEntity(title = step, context = template.context, priority = 3)
+            })
+        }
+    }
 
     // ── Add task sheet state ──────────────────────────────────────────────────
 
@@ -166,6 +273,37 @@ class MainViewModel @Inject constructor(
         updateAddTaskState { copy(existingSubtasks = existingSubtasks.filter { it.id != task.id }) }
     }
 
+    // ── Dependency picker ─────────────────────────────────────────────────────
+
+    /**
+     * Toggles [depId] as a blocker for the task being created/edited. Refuses to add
+     * it if doing so would create a loop (A blocks B blocks A) and surfaces a warning
+     * instead — silently allowing that would let a task go permanently un-doable.
+     */
+    fun toggleDependency(depId: UUID) {
+        val state = _addTaskState.value
+        if (depId in state.dependencyIds) {
+            updateAddTaskState {
+                copy(dependencyIds = dependencyIds - depId, dependencyCycleWarning = null)
+            }
+            return
+        }
+        val wouldCycle = DependencyGraph.wouldCreateCycle(
+            taskId = _editingTaskId.value,
+            proposedDependencyId = depId,
+            allTasks = allTasks.value
+        )
+        if (wouldCycle) {
+            updateAddTaskState {
+                copy(dependencyCycleWarning = "Cannae dae that — it'd loop back on itself.")
+            }
+        } else {
+            updateAddTaskState {
+                copy(dependencyIds = dependencyIds + depId, dependencyCycleWarning = null)
+            }
+        }
+    }
+
     // ── Save task ─────────────────────────────────────────────────────────────
 
     fun saveTask() {
@@ -227,6 +365,7 @@ class MainViewModel @Inject constructor(
     fun completeTask(task: TaskEntity) {
         viewModelScope.launch {
             taskRepository.completeTask(task)
+            _completionCelebration.value = CompletionCelebration(task.title, task.xpValue)
             dataLayerSync.sendTaskUpdate(task.id, true)
             reminderScheduler.cancelTask(appContext, task)
         }
@@ -235,6 +374,7 @@ class MainViewModel @Inject constructor(
     fun completeSubtask(task: TaskEntity) {
         viewModelScope.launch {
             taskRepository.completeTask(task)
+            _completionCelebration.value = CompletionCelebration(task.title, task.xpValue)
             dataLayerSync.sendTaskUpdate(task.id, true)
             task.parentId?.let { taskRepository.autoCompleteParentIfDone(it) }
         }
@@ -243,6 +383,7 @@ class MainViewModel @Inject constructor(
     fun completeTaskWithTime(task: TaskEntity, actualMinutes: Int?) {
         viewModelScope.launch {
             taskRepository.completeTask(task.copy(actualMinutes = actualMinutes))
+            _completionCelebration.value = CompletionCelebration(task.title, task.xpValue)
             dataLayerSync.sendTaskUpdate(task.id, true)
             task.parentId?.let { taskRepository.autoCompleteParentIfDone(it) }
         }
@@ -275,6 +416,14 @@ class MainViewModel @Inject constructor(
 
     fun deleteTask(task: TaskEntity) {
         viewModelScope.launch { taskRepository.deleteTask(task) }
+    }
+
+    fun archiveTask(task: TaskEntity) {
+        viewModelScope.launch { taskRepository.archiveTask(task) }
+    }
+
+    fun unarchiveTask(task: TaskEntity) {
+        viewModelScope.launch { taskRepository.unarchiveTask(task) }
     }
 
     fun deleteTaskById(id: UUID) {

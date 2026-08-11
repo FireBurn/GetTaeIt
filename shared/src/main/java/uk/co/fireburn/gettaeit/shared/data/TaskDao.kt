@@ -17,11 +17,15 @@ interface TaskDao {
     @Query("SELECT * FROM tasks ORDER BY priority ASC, dueDate ASC")
     fun getAllTasks(): Flow<List<TaskEntity>>
 
+    /** One-shot snapshot of every task, for reconciling against Firestore on sign-in. */
+    @Query("SELECT * FROM tasks")
+    suspend fun getAllTasksOnce(): List<TaskEntity>
+
     /** Active tasks = not completed AND (not snoozed OR snooze expired) AND nextOccurrence is null or past */
     @Query(
         """
         SELECT * FROM tasks
-        WHERE isCompleted = 0
+        WHERE isCompleted = 0 AND isArchived = 0
           AND (isSnoozed = 0 OR snoozedUntil <= :nowMs)
           AND (nextOccurrenceAt IS NULL OR nextOccurrenceAt <= :nowMs)
         ORDER BY priority ASC, dueDate ASC
@@ -53,8 +57,18 @@ interface TaskDao {
     fun getTopLevelTasks(): Flow<List<TaskEntity>>
 
     /** All top-level tasks including completed, for dependency picker. */
-    @Query("SELECT * FROM tasks WHERE parentId IS NULL AND isCompleted = 0 ORDER BY title ASC")
+    @Query("SELECT * FROM tasks WHERE parentId IS NULL AND isCompleted = 0 AND isArchived = 0 ORDER BY title ASC")
     fun getAllActiveToplevelTasks(): Flow<List<TaskEntity>>
+
+    @Query("SELECT * FROM tasks WHERE parentId IS NULL AND isArchived = 0 ORDER BY dueDate ASC, priority ASC")
+    fun getReviewableTopLevelTasks(): Flow<List<TaskEntity>>
+
+    @Query("SELECT * FROM tasks WHERE parentId IS NULL AND isArchived = 1 ORDER BY title ASC")
+    fun getArchivedTopLevelTasks(): Flow<List<TaskEntity>>
+
+    /** Completed work for the current local day, used for a gentle wins summary. */
+    @Query("SELECT * FROM tasks WHERE isCompleted = 1 AND completedAt >= :startOfDayMs")
+    fun getCompletedSince(startOfDayMs: Long): Flow<List<TaskEntity>>
 
     /** Get all subtasks for a parent to check if all complete. */
     @Query("SELECT * FROM tasks WHERE parentId = :parentId")

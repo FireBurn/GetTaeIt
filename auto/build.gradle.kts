@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "uk.co.fireburn.gettaeit.auto"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "uk.co.fireburn.gettaeit.auto"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }
@@ -47,4 +47,5 @@ dependencies {
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    annotationProcessor("org.jetbrains.kotlin:kotlin-metadata-jvm:${libs.versions.kotlinMetadataJvm.get()}")
 }

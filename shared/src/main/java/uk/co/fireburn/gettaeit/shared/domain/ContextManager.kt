@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import uk.co.fireburn.gettaeit.shared.data.UserPreferences
-import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -91,37 +90,11 @@ class ContextManager @Inject constructor(
         geofenceManager.isAtWorkLocation,
         _lastKnownWifiSsid
     ) { prefs, isAtWork, currentSsid ->
-        determineMode(prefs, isAtWork, currentSsid)
-    }
-
-    private fun determineMode(
-        prefs: UserPreferences,
-        isAtWork: Boolean,
-        currentSsid: String?
-    ): AppMode {
-        val now = Calendar.getInstance()
-        val dayOfWeek = now.get(Calendar.DAY_OF_WEEK)
-        val currentHour = now.get(Calendar.HOUR_OF_DAY)
-
-        val isWorkDay = prefs.workSchedule.workingDays.contains(dayOfWeek)
-        val isWorkHours =
-            isWorkDay && currentHour in prefs.workSchedule.startHour until prefs.workSchedule.endHour
-
-        // WiFi SSID match
-        val isOnWorkWifi = prefs.workSsid != null &&
-                currentSsid != null &&
-                currentSsid.equals(prefs.workSsid, ignoreCase = true)
-
-        // Commute window: within 30 min of work start/end and NOT at work location
-        val isCommuteHour = isWorkDay && !isAtWork && !isOnWorkWifi && (
-                currentHour == prefs.workSchedule.startHour - 1 ||
-                        currentHour == prefs.workSchedule.endHour
-                )
-
-        return when {
-            isAtWork || isOnWorkWifi || isWorkHours -> AppMode.WORK
-            isCommuteHour -> AppMode.COMMUTE
-            else -> AppMode.PERSONAL
-        }
+        ContextModeDecider.decide(
+            preferences = prefs,
+            isAtWorkLocation = isAtWork,
+            currentSsid = currentSsid,
+            now = java.util.Calendar.getInstance()
+        )
     }
 }

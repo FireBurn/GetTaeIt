@@ -19,13 +19,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -33,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,22 +45,28 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.rememberPermissionState
+import kotlinx.coroutines.launch
+import uk.co.fireburn.gettaeit.auth.GoogleSignInHelper
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
+) {
     val prefs by viewModel.userPreferences.collectAsState()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
@@ -104,6 +115,27 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
+
+        SettingsCard(
+            title = "🏖️ Vacation Mode",
+            subtitle = "Keep work tasks out of sight, even at the office"
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    if (prefs.isVacationMode) "Aye, protect your time." else "Off — work context can switch on normally.",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Switch(
+                    checked = prefs.isVacationMode,
+                    onCheckedChange = viewModel::setVacationMode
+                )
+            }
+        }
 
         // ── Work schedule ────────────────────────────────────────────────────
         SettingsCard(title = "⏰ Work Hours", subtitle = "When should Work Mode kick in?") {
@@ -305,6 +337,98 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Open App Settings") }
+            }
+        }
+
+        // ── Backup & Sync ────────────────────────────────────────────────────
+        SettingsCard(title = "☁️ Backup & Sync", subtitle = null) {
+            val currentUser by authViewModel.currentUser.collectAsState()
+            val isSigningIn by authViewModel.isSigningIn.collectAsState()
+            val signInError by authViewModel.signInError.collectAsState()
+            val coroutineScope = rememberCoroutineScope()
+
+            when {
+                !authViewModel.isConfigured -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.CloudOff, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            "Not set up on this build yet — your tasks stay on this device only.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                currentUser != null -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.CloudDone, null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                currentUser?.displayName ?: currentUser?.email ?: "Signed in",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                "Backed up automatically",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    TextButton(onClick = { authViewModel.signOut() }) { Text("Sign out") }
+                }
+
+                else -> {
+                    Text(
+                        "Sign in so a lost or reset phone doesn't cost you your list.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Button(
+                        onClick = {
+                            authViewModel.onSignInStarting()
+                            coroutineScope.launch {
+                                val token = GoogleSignInHelper.requestIdToken(context)
+                                authViewModel.onGoogleIdToken(token)
+                            }
+                        },
+                        enabled = !isSigningIn,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isSigningIn) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Icon(Icons.Filled.AccountCircle, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Sign in with Google")
+                        }
+                    }
+                    signInError?.let { err ->
+                        Text(
+                            err,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
             }
         }
 

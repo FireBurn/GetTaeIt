@@ -458,9 +458,10 @@ class GeminiNanoStrategy @Inject constructor(
                 Task: "$prompt"
                 Only break a task into steps if it has multiple distinct stages (e.g. clean the house, write a report, do the shopping). Single-action tasks (e.g. brush teeth, take medication, make a call) need no steps — output nothing for them.
                 Output EXACTLY in this format:
-                MAIN: Task Title|Minutes
+                MAIN: Task Title|Context|Minutes
                 SUB: Step one|Minutes
                 SUB: Step two|Minutes
+                Context must be one of WORK, PERSONAL, or ANY.
                 Omit all SUB lines if the task is simple. Do not output any markdown or intro text.
             """.trimIndent()
 
@@ -481,10 +482,10 @@ class GeminiNanoStrategy @Inject constructor(
                     val content = cleanLine.substring(5).trim()
                     val parts = content.split("|")
                     if (parts.isNotEmpty()) mainTitle = parts[0].trim()
-                    if (parts.size > 1) {
-                        mainContext = if (parts[1].trim()
-                                .equals("WORK", true)
-                        ) TaskContext.WORK else TaskContext.PERSONAL
+                    if (parts.size > 1) mainContext = when (parts[1].trim().uppercase()) {
+                        "WORK" -> TaskContext.WORK
+                        "ANY" -> TaskContext.ANY
+                        else -> TaskContext.PERSONAL
                     }
                     if (parts.size > 2) {
                         mainMins = parts[2].trim().filter { it.isDigit() }.toIntOrNull()

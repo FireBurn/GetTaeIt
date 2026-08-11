@@ -14,6 +14,13 @@ interface TaskRepository {
     /** All active top-level tasks regardless of mode (for dependency picker). */
     fun getAllActiveToplevelTasks(): Flow<List<TaskEntity>>
 
+    /** Completed tasks since the start of the current local day. */
+    fun getCompletedToday(): Flow<List<TaskEntity>>
+
+    /** All non-archived top-level tasks, for the weekly review. */
+    fun getReviewableTopLevelTasks(): Flow<List<TaskEntity>>
+    fun getArchivedTopLevelTasks(): Flow<List<TaskEntity>>
+
     /** Check all subtasks and auto-complete parent if all done. */
     suspend fun autoCompleteParentIfDone(parentId: UUID)
 
@@ -48,6 +55,8 @@ interface TaskRepository {
 
     suspend fun updateTask(task: TaskEntity)
     suspend fun deleteTask(task: TaskEntity)
+    suspend fun archiveTask(task: TaskEntity)
+    suspend fun unarchiveTask(task: TaskEntity)
 
     /** Reset any recurring tasks whose nextOccurrenceAt has passed. Called by WorkManager. */
     suspend fun resetDueRecurrences()
