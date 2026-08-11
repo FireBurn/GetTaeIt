@@ -24,8 +24,8 @@ codebase. Validate each item on a physical device before marking it complete.
   and exact-alarm behaviour where applicable.
 - [ ] Test phone ↔ Wear completion/snooze/voice sync and the Auto experience on
   actual supported hardware or emulators.
-- [ ] Add a privacy policy, in-app explanation of location/Wi-Fi/AI use, data
-  deletion/export controls, and Play Store data-safety declarations.
+- [ ] Add in-app privacy explanation and data deletion/export controls; publish
+  [PRIVACY.md](PRIVACY.md) with Play Store Data Safety declarations.
 
 ## High-value product work
 
