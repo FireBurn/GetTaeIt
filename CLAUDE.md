@@ -55,8 +55,8 @@ Use the Gradle wrapper, not a system Gradle installation. In restricted
 environments, keep the Gradle cache outside the repository:
 
 ```bash
-GRADLE_USER_HOME=/tmp/gettaeit-gradle ./gradlew test --console=plain
-GRADLE_USER_HOME=/tmp/gettaeit-gradle ./gradlew :app:assembleDebug --console=plain
+GRADLE_USER_HOME=/home/fireburn/GetTaeIt-tmp/gradle-cache ./gradlew test --console=plain
+GRADLE_USER_HOME=/home/fireburn/GetTaeIt-tmp/gradle-cache ./gradlew :app:assembleDebug --console=plain
 ```
 
 `test` currently verifies compilation but has little/no unit-test coverage.
