@@ -51,8 +51,8 @@ codebase. Validate each item on a physical device before marking it complete.
 
 ## Ecosystem polish
 
-- [ ] Add a Wear complication for the one next actionable task and confirm the
-  declared Tiles have complete implementations and previews.
+- [ ] Add a Wear complication for the one next actionable task. Tiles are not
+  declared until their implementations and previews are ready.
 - [ ] Add distinct, accessible Wear haptic patterns for start, reminder, and
   timer completion, with a user setting to disable them.
 - [ ] Complete Auto’s driver-safe morning briefing and voice capture feedback;

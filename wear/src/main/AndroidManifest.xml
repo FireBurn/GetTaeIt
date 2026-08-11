@@ -44,34 +44,6 @@
             android:name="com.google.android.wearable.standalone"
             android:value="false" />
 
-        <!-- Task List Tile -->
-        <service
-            android:name=".tiles.TaskListTileService"
-            android:exported="true"
-            android:label="My Tasks"
-            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
-            <intent-filter>
-                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
-            </intent-filter>
-            <meta-data
-                android:name="androidx.wear.tiles.PREVIEW"
-                android:resource="@android:drawable/sym_def_app_icon" />
-        </service>
-
-        <!-- Voice / Add Task Tile -->
-        <service
-            android:name=".tiles.VoiceTileService"
-            android:exported="true"
-            android:label="Add Task"
-            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
-            <intent-filter>
-                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
-            </intent-filter>
-            <meta-data
-                android:name="androidx.wear.tiles.PREVIEW"
-                android:resource="@android:drawable/sym_def_app_icon" />
-        </service>
-
     </application>
 
 </manifest>
