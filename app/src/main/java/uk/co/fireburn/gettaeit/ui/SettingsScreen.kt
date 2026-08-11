@@ -117,6 +117,22 @@ fun SettingsScreen(
         )
 
         SettingsCard(
+            title = "🔒 Your data",
+            subtitle = "What Get Tae It uses and why"
+        ) {
+            Text(
+                "Tasks stay on this device by default. Location and Wi‑Fi are optional and only switch context; voice is only used when you capture by voice; on-device AI is preferred for task help. Firebase backup starts only after you sign in.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "Full policy: PRIVACY.md in the app project. You can remove location/Wi‑Fi settings below or revoke Android permissions at any time.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
+
+        SettingsCard(
             title = "🏖️ Vacation Mode",
             subtitle = "Keep work tasks out of sight, even at the office"
         ) {
