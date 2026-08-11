@@ -154,6 +154,15 @@ fun AddTaskScreen(
                 maxLines = 3
             )
 
+            OutlinedTextField(
+                value = state.frictionNote,
+                onValueChange = { viewModel.updateAddTaskState { copy(frictionNote = it) } },
+                label = { Text("What might get in the way? (optional)") },
+                supportingText = { Text("A private reminder for when this task gets sticky.") },
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 2
+            )
+
             // ── Context selector ─────────────────────────────────────────────
             SectionLabel("Context")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

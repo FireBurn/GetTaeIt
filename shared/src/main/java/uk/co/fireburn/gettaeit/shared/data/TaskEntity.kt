@@ -65,6 +65,8 @@ data class TaskEntity(
     // Core
     val title: String,
     val description: String? = null,
+    /** A user-authored reminder of what made this task hard to start last time. */
+    val frictionNote: String? = null,
     val context: TaskContext = TaskContext.PERSONAL,
     val priority: Int = 3,                       // 1 = urgent, 5 = someday
     val effortLevel: EffortLevel = EffortLevel.MEDIUM,

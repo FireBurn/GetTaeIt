@@ -70,7 +70,7 @@ codebase. Validate each item on a physical device before marking it complete.
   overdue warning.
 - [x] Add **body-doubling/focus sessions** with an optional countdown and a
   concise start/finish ritual; keep it useful without requiring social sharing.
-- [ ] Add **friction notes** to tasks (what stopped me last time?) so the app
+- [x] Add **friction notes** to tasks (what stopped me last time?) so the app
   can suggest the smallest next action or prerequisite.
 - [x] Add **capture now, classify later**: one always-available inbox action
   that accepts text without forcing dates, priority, or context up front.

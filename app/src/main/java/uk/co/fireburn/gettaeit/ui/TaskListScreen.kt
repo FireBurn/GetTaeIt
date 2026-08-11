@@ -804,6 +804,12 @@ private fun GentleReentryDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("“${task.title}” has been hanging about. That is not a failure.")
+                task.frictionNote?.takeIf { it.isNotBlank() }?.let { note ->
+                    Text(
+                        "Last time you noted: $note",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Text(
                     "Pick the kindest next move.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant

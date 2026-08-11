@@ -37,6 +37,7 @@ import javax.inject.Inject
 data class AddTaskUiState(
     val title: String = "",
     val description: String = "",
+    val frictionNote: String = "",
     val context: TaskContext = TaskContext.PERSONAL,
     val priority: Int = 3,
     val effortLevel: EffortLevel = EffortLevel.MEDIUM,
@@ -328,6 +329,7 @@ class MainViewModel @Inject constructor(
                 id = parentId,
                 title = state.title.trim(),
                 description = state.description.trim().ifBlank { null },
+                frictionNote = state.frictionNote.trim().ifBlank { null },
                 context = state.context,
                 priority = state.priority,
                 effortLevel = state.effortLevel,
@@ -460,6 +462,7 @@ class MainViewModel @Inject constructor(
             _addTaskState.value = AddTaskUiState(
                 title = task.title,
                 description = task.description ?: "",
+                frictionNote = task.frictionNote ?: "",
                 context = task.context,
                 priority = task.priority,
                 effortLevel = task.effortLevel,
@@ -524,6 +527,7 @@ class MainViewModel @Inject constructor(
             val updated = existing.copy(
                 title = state.title.trim(),
                 description = state.description.trim().ifBlank { null },
+                frictionNote = state.frictionNote.trim().ifBlank { null },
                 context = state.context,
                 priority = state.priority,
                 effortLevel = state.effortLevel,
