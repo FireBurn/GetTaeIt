@@ -10,4 +10,10 @@ class RoutineTemplatesTest {
         assertEquals(RoutineTemplates.all.size, RoutineTemplates.all.map { it.id }.toSet().size)
         assertTrue(RoutineTemplates.all.all { it.steps.isNotEmpty() && it.steps.all(String::isNotBlank) })
     }
+
+    @Test
+    fun `shopping and cleaning resets are available`() {
+        assertTrue(RoutineTemplates.all.any { it.id == "shopping_reset" })
+        assertTrue(RoutineTemplates.all.any { it.id == "tiny_tidy" })
+    }
 }

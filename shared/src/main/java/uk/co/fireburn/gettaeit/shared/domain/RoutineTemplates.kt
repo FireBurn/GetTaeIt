@@ -29,6 +29,18 @@ object RoutineTemplates {
             label = "Work shutdown",
             context = TaskContext.WORK,
             steps = listOf("Write tomorrow's first step", "Close work tabs", "Leave work at work")
+        ),
+        RoutineTemplate(
+            id = "shopping_reset",
+            label = "Shopping reset",
+            context = TaskContext.PERSONAL,
+            steps = listOf("Check what is already in", "Write the essentials", "Bring bags")
+        ),
+        RoutineTemplate(
+            id = "tiny_tidy",
+            label = "Tiny tidy",
+            context = TaskContext.PERSONAL,
+            steps = listOf("Set a 10-minute timer", "Put away five things", "Take rubbish out")
         )
     )
 }
