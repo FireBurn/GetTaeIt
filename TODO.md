@@ -47,7 +47,7 @@ codebase. Validate each item on a physical device before marking it complete.
   simple reschedule/archival path that avoids guilt-inducing language.
 - [x] Support built-in task templates for morning, leaving home, and work
   shutdown routines.
-- [ ] Add user-created reusable templates. Shopping and cleaning resets are included.
+- [x] Add user-created reusable templates. Shopping and cleaning resets are included.
 
 ## Ecosystem polish
 

@@ -39,6 +39,7 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
     val navController = rememberNavController()
     val isGoblinMode by viewModel.isGoblinMode.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
+    val userRoutineTemplates by viewModel.userRoutineTemplates.collectAsState()
     val focusSession by viewModel.focusSession.collectAsState()
     var showQuickCapture by rememberSaveable { mutableStateOf(false) }
     val navItems = listOf(
@@ -165,6 +166,8 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
                 viewModel.addRoutineTemplate(it)
                 showQuickCapture = false
             },
+            userTemplates = userRoutineTemplates,
+            onSaveTemplate = viewModel::saveUserRoutineTemplate,
             onPlanInstead = {
                 showQuickCapture = false
                 viewModel.cancelEdit()

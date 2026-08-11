@@ -24,10 +24,15 @@ import uk.co.fireburn.gettaeit.shared.domain.RoutineTemplates
 fun QuickCaptureDialog(
     onSave: (String) -> Unit,
     onTemplate: (RoutineTemplate) -> Unit,
+    userTemplates: List<RoutineTemplate>,
+    onSaveTemplate: (String, List<String>) -> Unit,
     onPlanInstead: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var text by remember { mutableStateOf("") }
+    var templateName by remember { mutableStateOf("") }
+    var templateSteps by remember { mutableStateOf("") }
+    var creatingTemplate by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
     AlertDialog(
@@ -44,7 +49,7 @@ fun QuickCaptureDialog(
                     minLines = 2
                 )
                 Text("Or start with a wee routine")
-                RoutineTemplates.all.chunked(2).forEach { row ->
+                (RoutineTemplates.all + userTemplates).chunked(2).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         row.forEach { template ->
                             AssistChip(
@@ -53,6 +58,34 @@ fun QuickCaptureDialog(
                             )
                         }
                     }
+                }
+                TextButton(onClick = { creatingTemplate = !creatingTemplate }) {
+                    Text(if (creatingTemplate) "Cancel new routine" else "Create a routine")
+                }
+                if (creatingTemplate) {
+                    OutlinedTextField(
+                        value = templateName,
+                        onValueChange = { templateName = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Routine name") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = templateSteps,
+                        onValueChange = { templateSteps = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Steps — one per line") },
+                        minLines = 3
+                    )
+                    TextButton(
+                        enabled = templateName.isNotBlank() && templateSteps.lines().any(String::isNotBlank),
+                        onClick = {
+                            onSaveTemplate(templateName, templateSteps.lines())
+                            templateName = ""
+                            templateSteps = ""
+                            creatingTemplate = false
+                        }
+                    ) { Text("Save routine") }
                 }
             }
         },

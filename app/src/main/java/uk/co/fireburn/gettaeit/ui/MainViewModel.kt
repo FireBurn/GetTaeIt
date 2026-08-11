@@ -29,6 +29,7 @@ import uk.co.fireburn.gettaeit.shared.domain.ContextManager
 import uk.co.fireburn.gettaeit.shared.domain.DependencyGraph
 import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
 import uk.co.fireburn.gettaeit.shared.domain.RoutineTemplate
+import uk.co.fireburn.gettaeit.shared.domain.UserPreferencesRepository
 import uk.co.fireburn.gettaeit.shared.domain.ai.HybridTaskService
 import java.util.Calendar
 import java.util.UUID
@@ -72,6 +73,7 @@ data class CompletionCelebration(val taskTitle: String, val xp: Int)
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val taskRepository: TaskRepository,
+    private val userPreferencesRepository: UserPreferencesRepository,
     private val contextManager: ContextManager,
     private val hybridTaskService: HybridTaskService,
     private val dataLayerSync: DataLayerSync,
@@ -89,6 +91,10 @@ class MainViewModel @Inject constructor(
 
     val allTasks: StateFlow<List<TaskEntity>> = taskRepository.getAllActiveToplevelTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val userRoutineTemplates: StateFlow<List<RoutineTemplate>> =
+        userPreferencesRepository.getUserRoutineTemplates()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val completedToday: StateFlow<List<TaskEntity>> = taskRepository.getCompletedToday()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -177,6 +183,21 @@ class MainViewModel @Inject constructor(
             taskRepository.addAll(template.steps.map { step ->
                 TaskEntity(title = step, context = template.context, priority = 3)
             })
+        }
+    }
+
+    fun saveUserRoutineTemplate(label: String, steps: List<String>) {
+        val cleanedSteps = steps.map(String::trim).filter(String::isNotBlank)
+        if (label.isBlank() || cleanedSteps.isEmpty()) return
+        viewModelScope.launch {
+            userPreferencesRepository.saveUserRoutineTemplate(
+                RoutineTemplate(
+                    id = "user_${UUID.randomUUID()}",
+                    label = label.trim(),
+                    context = TaskContext.PERSONAL,
+                    steps = cleanedSteps
+                )
+            )
         }
     }
 

@@ -19,7 +19,9 @@ data class UserPreferences(
     val workLocationRadius: Float = 100f, // metres
     val workSsid: String? = null,
     val homeSsid: String? = null,
-    val isVacationMode: Boolean = false
+    val isVacationMode: Boolean = false,
+    /** JSON list of user-created [RoutineTemplate]s; kept with the user's other local preferences. */
+    val routineTemplatesJson: String = "[]"
 ) {
     val workLocationLatLng: Pair<Double, Double>?
         get() = workLocationString?.split(',')?.let {

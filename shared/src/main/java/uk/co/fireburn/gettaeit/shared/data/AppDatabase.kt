@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [TaskEntity::class, UserPreferences::class],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -35,6 +35,11 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE tasks ADD COLUMN frictionNote TEXT")
             }
         }
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE user_preferences ADD COLUMN routineTemplatesJson TEXT NOT NULL DEFAULT '[]'")
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -45,7 +50,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "get_tae_it_database"
                 )
-                    .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+                    .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                     .also { INSTANCE = it }
