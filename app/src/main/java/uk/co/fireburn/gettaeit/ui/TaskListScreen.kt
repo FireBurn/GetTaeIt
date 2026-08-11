@@ -89,6 +89,7 @@ import uk.co.fireburn.gettaeit.shared.domain.AppMode
 import uk.co.fireburn.gettaeit.shared.domain.DependencyGraph
 import uk.co.fireburn.gettaeit.shared.domain.RecurrenceEngine
 import uk.co.fireburn.gettaeit.shared.domain.TaskNowFilter
+import uk.co.fireburn.gettaeit.shared.domain.AdaptiveSuggestion
 import uk.co.fireburn.gettaeit.ui.theme.MonoLabelStyle
 
 /** Personal tasks read as thistle, work tasks as loch — same trio as the rest of the app. */
@@ -113,6 +114,7 @@ fun TaskListScreen(
     val allTasks by viewModel.allTasks.collectAsState()
     val completedToday by viewModel.completedToday.collectAsState()
     val completionCelebration by viewModel.completionCelebration.collectAsState()
+    val adaptiveSuggestion by viewModel.adaptiveSuggestion.collectAsState()
     var availableMinutes by rememberSaveable { mutableStateOf<Int?>(null) }
     var lowEnergyOnly by rememberSaveable { mutableStateOf(false) }
     val visibleTasks = remember(tasks, availableMinutes, lowEnergyOnly) {
@@ -149,6 +151,12 @@ fun TaskListScreen(
             totalXp = completedToday.sumOf { it.xpValue },
             bestStreak = bestStreak
         )
+        adaptiveSuggestion?.let { suggestion ->
+            AdaptiveSuggestionCard(
+                suggestion = suggestion,
+                onDismiss = { viewModel.dismissAdaptiveSuggestion(suggestion.taskId) }
+            )
+        }
         TaskNowFilterBar(
             availableMinutes = availableMinutes,
             lowEnergyOnly = lowEnergyOnly,
@@ -185,6 +193,27 @@ fun TaskListScreen(
                     )
                 }
                 item { Spacer(Modifier.height(96.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdaptiveSuggestionCard(suggestion: AdaptiveSuggestion, onDismiss: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+    ) {
+        Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 8.dp)) {
+            Text(suggestion.message, fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    suggestion.explanation,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                TextButton(onClick = onDismiss) { Text("Not now") }
             }
         }
     }

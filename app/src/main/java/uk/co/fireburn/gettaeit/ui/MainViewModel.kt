@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,8 @@ import uk.co.fireburn.gettaeit.shared.domain.DependencyGraph
 import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
 import uk.co.fireburn.gettaeit.shared.domain.RoutineTemplate
 import uk.co.fireburn.gettaeit.shared.domain.UserPreferencesRepository
+import uk.co.fireburn.gettaeit.shared.domain.AdaptiveSuggestion
+import uk.co.fireburn.gettaeit.shared.domain.AdaptiveSuggestionEngine
 import uk.co.fireburn.gettaeit.shared.domain.ai.HybridTaskService
 import java.util.Calendar
 import java.util.UUID
@@ -103,6 +106,18 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val archivedTasks: StateFlow<List<TaskEntity>> = taskRepository.getArchivedTopLevelTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _dismissedSuggestionId = MutableStateFlow<UUID?>(null)
+    val adaptiveSuggestion: StateFlow<AdaptiveSuggestion?> = combine(
+        tasks, completedToday, reviewTasks, _dismissedSuggestionId
+    ) { active, completed, review, dismissedId ->
+        AdaptiveSuggestionEngine.suggest(active, completed, review.filter { it.isSnoozed })
+            ?.takeIf { it.taskId != dismissedId }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun dismissAdaptiveSuggestion(taskId: UUID) {
+        _dismissedSuggestionId.value = taskId
+    }
 
     private val _completionCelebration = MutableStateFlow<CompletionCelebration?>(null)
     val completionCelebration: StateFlow<CompletionCelebration?> = _completionCelebration.asStateFlow()

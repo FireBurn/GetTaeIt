@@ -36,7 +36,7 @@ codebase. Validate each item on a physical device before marking it complete.
 - [ ] Build a proper shopping model (`ShoppingItemEntity`), shopping list UI,
   bought state, and supermarket location support. Add aisle sorting only after
   users can correct the category easily.
-- [ ] Add a lightweight adaptive suggestion engine based on explicit task
+- [x] Add a lightweight adaptive suggestion engine based on explicit task
   completions and snoozes. Make every suggestion dismissible and explainable;
   never silently change a reminder schedule.
 - [x] Add an “energy/time available” check-in to filter the next task by
