@@ -74,4 +74,4 @@ codebase. Validate each item on a physical device before marking it complete.
   can suggest the smallest next action or prerequisite.
 - [x] Add **capture now, classify later**: one always-available inbox action
   that accepts text without forcing dates, priority, or context up front.
-- [ ] Extend quick capture to voice input without forcing scheduling choices.
+- [x] Extend quick capture to voice input without forcing scheduling choices.

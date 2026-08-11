@@ -474,6 +474,21 @@ fun VoiceInputScreen(
                     Spacer(Modifier.height(20.dp))
                     Button(
                         onClick = {
+                            viewModel.quickCapture(editableText)
+                            onNavigateBack()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = ThistlePurple)
+                    ) { Text("Save to inbox") }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Save it now; you can organise it later.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = {
                             pendingVoiceText = editableText
                             viewModel.clearVoiceScheduleSuggestion()
                             awaitingScheduleRoute = true
@@ -481,7 +496,7 @@ fun VoiceInputScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = ThistlePurple)
-                    ) { Text("Schedule Task") }
+                    ) { Text("Plan it now") }
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = { startListening() }) {
                         Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
