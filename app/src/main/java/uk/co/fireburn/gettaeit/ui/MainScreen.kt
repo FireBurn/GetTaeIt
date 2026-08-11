@@ -45,6 +45,7 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
     val navItems = listOf(
         Screen.TaskList,
         Screen.KitchenDashboard,
+        Screen.Shopping,
         Screen.Settings
     )
 
@@ -132,6 +133,7 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
             composable(Screen.KitchenDashboard.route) {
                 KitchenDashboardScreen() // Uses its own specific ViewModel
             }
+            composable(Screen.Shopping.route) { ShoppingScreen() }
             composable(Screen.Settings.route) {
                 SettingsScreen() // Uses its own specific ViewModel
             }

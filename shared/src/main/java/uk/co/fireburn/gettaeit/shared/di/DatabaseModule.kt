@@ -12,8 +12,11 @@ import uk.co.fireburn.gettaeit.shared.data.TaskDao
 import uk.co.fireburn.gettaeit.shared.data.TaskRepositoryImpl
 import uk.co.fireburn.gettaeit.shared.data.UserPreferencesDao
 import uk.co.fireburn.gettaeit.shared.data.UserPreferencesRepositoryImpl
+import uk.co.fireburn.gettaeit.shared.data.ShoppingItemDao
+import uk.co.fireburn.gettaeit.shared.data.ShoppingRepositoryImpl
 import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
 import uk.co.fireburn.gettaeit.shared.domain.UserPreferencesRepository
+import uk.co.fireburn.gettaeit.shared.domain.ShoppingRepository
 import javax.inject.Singleton
 
 @Module
@@ -31,6 +34,9 @@ abstract class DatabaseModule {
         impl: UserPreferencesRepositoryImpl
     ): UserPreferencesRepository
 
+    @Binds @Singleton
+    abstract fun bindShoppingRepository(impl: ShoppingRepositoryImpl): ShoppingRepository
+
     companion object {
         @Provides
         @Singleton
@@ -42,5 +48,7 @@ abstract class DatabaseModule {
 
         @Provides
         fun provideUserPreferencesDao(db: AppDatabase): UserPreferencesDao = db.userPreferencesDao()
+
+        @Provides fun provideShoppingItemDao(db: AppDatabase): ShoppingItemDao = db.shoppingItemDao()
     }
 }

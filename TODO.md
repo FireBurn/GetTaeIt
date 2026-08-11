@@ -33,7 +33,7 @@ codebase. Validate each item on a physical device before marking it complete.
   highest-value available task and hides planning/navigation noise.
 - [x] Finish gamification: surface XP meaningfully, use restrained completion
   celebration, and make streak rules transparent and forgiving.
-- [ ] Build a proper shopping model (`ShoppingItemEntity`), shopping list UI,
+- [x] Build a proper shopping model (`ShoppingItemEntity`), shopping list UI,
   bought state, and supermarket location support. Add aisle sorting only after
   users can correct the category easily.
 - [x] Add a lightweight adaptive suggestion engine based on explicit task
