@@ -65,7 +65,7 @@ codebase. Validate each item on a physical device before marking it complete.
 
 ## Additional ADHD-first ideas
 
-- [ ] Add a **gentle re-entry** flow for tasks left untouched: offer “make it
+- [x] Add a **gentle re-entry** flow for tasks left untouched: offer “make it
   smaller”, “snooze without guilt”, “ask for help”, or “archive” instead of an
   overdue warning.
 - [x] Add **body-doubling/focus sessions** with an optional countdown and a

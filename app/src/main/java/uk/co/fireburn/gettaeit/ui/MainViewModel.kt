@@ -425,6 +425,25 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { taskRepository.archiveTask(task) }
     }
 
+    /** Turn a stuck task into concrete next moves using the on-device-first AI service. */
+    fun makeTaskSmaller(task: TaskEntity) {
+        viewModelScope.launch {
+            val steps = hybridTaskService.generateSubtasks(task.title)
+            if (steps.isEmpty()) return@launch
+            taskRepository.addAll(steps.map { step ->
+                TaskEntity(
+                    title = step.title,
+                    context = task.context,
+                    priority = task.priority,
+                    effortLevel = task.effortLevel,
+                    parentId = task.id,
+                    isSubtask = true,
+                    estimatedMinutes = step.estimatedMinutes
+                )
+            })
+        }
+    }
+
     fun unarchiveTask(task: TaskEntity) {
         viewModelScope.launch { taskRepository.unarchiveTask(task) }
     }

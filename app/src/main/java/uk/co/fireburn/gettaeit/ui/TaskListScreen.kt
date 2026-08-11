@@ -39,9 +39,11 @@ import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Snooze
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.WbSunny
+import android.content.Intent
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -70,6 +72,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
@@ -172,6 +175,8 @@ fun TaskListScreen(
                         },
                         onSnooze = { viewModel.snoozeTask(task) },
                         onSnoozeTomorrow = { viewModel.snoozeTomorrow(task) },
+                        onArchive = { viewModel.archiveTask(task) },
+                        onMakeSmaller = { viewModel.makeTaskSmaller(task) },
                         onDelete = { viewModel.deleteTask(task) },
                         onEdit = {
                             viewModel.loadTaskForEditing(task)
@@ -387,6 +392,8 @@ fun TaskGroup(
     onCompleteSubtaskWithTime: (TaskEntity, Int?) -> Unit,
     onSnooze: () -> Unit,
     onSnoozeTomorrow: () -> Unit,
+    onArchive: () -> Unit,
+    onMakeSmaller: () -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit = {}
 ) {
@@ -399,6 +406,8 @@ fun TaskGroup(
         onCompleteSubtaskWithTime = onCompleteSubtaskWithTime,
         onSnooze = onSnooze,
         onSnoozeTomorrow = onSnoozeTomorrow,
+        onArchive = onArchive,
+        onMakeSmaller = onMakeSmaller,
         onDelete = onDelete,
         onEdit = onEdit
     )
@@ -415,6 +424,8 @@ fun TaskGroupStateful(
     onCompleteSubtaskWithTime: (TaskEntity, Int?) -> Unit,
     onSnooze: () -> Unit,
     onSnoozeTomorrow: () -> Unit,
+    onArchive: () -> Unit,
+    onMakeSmaller: () -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit = {},
     viewModel: MainViewModel = hiltViewModel()
@@ -453,6 +464,8 @@ fun TaskGroupStateful(
             totalCount = totalCount,
             onSnooze = onSnooze,
             onSnoozeTomorrow = onSnoozeTomorrow,
+            onArchive = onArchive,
+            onMakeSmaller = onMakeSmaller,
             onDelete = onDelete,
             onEdit = onEdit
         )
@@ -558,12 +571,37 @@ private fun ParentFooterCard(
     totalCount: Int,
     onSnooze: () -> Unit,
     onSnoozeTomorrow: () -> Unit,
+    onArchive: () -> Unit,
+    onMakeSmaller: () -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit = {}
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    var showGentleReentry by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val errorColor = MaterialTheme.colorScheme.error
     val tertiary = MaterialTheme.colorScheme.tertiary
+
+    if (showGentleReentry) {
+        GentleReentryDialog(
+            task = task,
+            onMakeSmaller = { onMakeSmaller(); showGentleReentry = false },
+            onSnoozeTomorrow = { onSnoozeTomorrow(); showGentleReentry = false },
+            onAskForHelp = {
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(
+                        Intent.EXTRA_TEXT,
+                        "Could you help me get started with “${task.title}”? Even a quick check-in would help."
+                    )
+                }
+                context.startActivity(Intent.createChooser(intent, "Ask for help"))
+                showGentleReentry = false
+            },
+            onArchive = { onArchive(); showGentleReentry = false },
+            onDismiss = { showGentleReentry = false }
+        )
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -715,6 +753,11 @@ private fun ParentFooterCard(
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                     DropdownMenuItem(
+                        text = { Text("Gentle reset") },
+                        leadingIcon = { Icon(Icons.Filled.AutoAwesome, null) },
+                        onClick = { showGentleReentry = true; showMenu = false }
+                    )
+                    DropdownMenuItem(
                         text = { Text("Edit task") },
                         leadingIcon = { Icon(Icons.Filled.Edit, null) },
                         onClick = { onEdit(); showMenu = false }
@@ -744,6 +787,39 @@ private fun ParentFooterCard(
             }
         }
     }
+}
+
+@Composable
+private fun GentleReentryDialog(
+    task: TaskEntity,
+    onMakeSmaller: () -> Unit,
+    onSnoozeTomorrow: () -> Unit,
+    onAskForHelp: () -> Unit,
+    onArchive: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Stuck is information") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("“${task.title}” has been hanging about. That is not a failure.")
+                Text(
+                    "Pick the kindest next move.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Column(horizontalAlignment = Alignment.End) {
+                TextButton(onClick = onMakeSmaller) { Text("Make it smaller") }
+                TextButton(onClick = onSnoozeTomorrow) { Text("Snooze without guilt") }
+                TextButton(onClick = onAskForHelp) { Text("Ask for help") }
+                TextButton(onClick = onArchive) { Text("Archive it") }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Not now") } }
+    )
 }
 
 // ─── Completion time dialog ───────────────────────────────────────────────────
