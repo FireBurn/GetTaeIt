@@ -8,6 +8,9 @@ import java.util.UUID
 
 enum class TaskContext { WORK, PERSONAL, ANY }
 
+/** How demanding a task feels, independently of how long it takes. */
+enum class EffortLevel { LOW, MEDIUM, HIGH }
+
 // ─── Recurrence: how often a task repeats ────────────────────────────────────
 
 /**
@@ -64,6 +67,7 @@ data class TaskEntity(
     val description: String? = null,
     val context: TaskContext = TaskContext.PERSONAL,
     val priority: Int = 3,                       // 1 = urgent, 5 = someday
+    val effortLevel: EffortLevel = EffortLevel.MEDIUM,
 
     // Status
     val isCompleted: Boolean = false,

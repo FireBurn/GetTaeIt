@@ -3,6 +3,7 @@ package uk.co.fireburn.gettaeit.shared.domain
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
+import uk.co.fireburn.gettaeit.shared.data.EffortLevel
 
 class TaskNowFilterTest {
     private val quick = TaskEntity(title = "Reply", estimatedMinutes = 5)
@@ -23,6 +24,17 @@ class TaskNowFilterTest {
         assertEquals(
             listOf(quick),
             TaskNowFilter.filter(listOf(quick, medium, long), null, true)
+        )
+    }
+
+    @Test
+    fun `explicit effort overrides duration for low energy filtering`() {
+        val longButEasy = TaskEntity(title = "Listen to an audiobook", estimatedMinutes = 45, effortLevel = EffortLevel.LOW)
+        val quickButDemanding = TaskEntity(title = "Hard phone call", estimatedMinutes = 5, effortLevel = EffortLevel.HIGH)
+
+        assertEquals(
+            listOf(longButEasy),
+            TaskNowFilter.filter(listOf(longButEasy, quickButDemanding), null, true)
         )
     }
 }

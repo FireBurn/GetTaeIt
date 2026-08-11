@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import uk.co.fireburn.gettaeit.notifications.ReminderScheduler
 import uk.co.fireburn.gettaeit.shared.DataLayerSync
 import uk.co.fireburn.gettaeit.shared.data.MissedBehaviour
+import uk.co.fireburn.gettaeit.shared.data.EffortLevel
 import uk.co.fireburn.gettaeit.shared.data.RecurrenceConfig
 import uk.co.fireburn.gettaeit.shared.data.RecurrenceType
 import uk.co.fireburn.gettaeit.shared.data.TaskContext
@@ -38,6 +39,7 @@ data class AddTaskUiState(
     val description: String = "",
     val context: TaskContext = TaskContext.PERSONAL,
     val priority: Int = 3,
+    val effortLevel: EffortLevel = EffortLevel.MEDIUM,
     val recurrenceType: RecurrenceType = RecurrenceType.NONE,
     val recurrenceInterval: Int = 1,
     val recurrenceDaysOfWeek: List<Int> = emptyList(),
@@ -328,6 +330,7 @@ class MainViewModel @Inject constructor(
                 description = state.description.trim().ifBlank { null },
                 context = state.context,
                 priority = state.priority,
+                effortLevel = state.effortLevel,
                 dueDate = state.dueDate,
                 recurrence = recurrenceConfig,
                 parentId = state.parentId,
@@ -440,6 +443,7 @@ class MainViewModel @Inject constructor(
                 description = task.description ?: "",
                 context = task.context,
                 priority = task.priority,
+                effortLevel = task.effortLevel,
                 recurrenceType = task.recurrence.type,
                 recurrenceInterval = task.recurrence.interval,
                 recurrenceDaysOfWeek = task.recurrence.daysOfWeek,
@@ -503,6 +507,7 @@ class MainViewModel @Inject constructor(
                 description = state.description.trim().ifBlank { null },
                 context = state.context,
                 priority = state.priority,
+                effortLevel = state.effortLevel,
                 dueDate = state.dueDate,
                 recurrence = recurrenceConfig,
                 dependencyIds = state.dependencyIds

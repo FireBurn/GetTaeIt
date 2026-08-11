@@ -46,4 +46,11 @@ class Converters {
 
     @TypeConverter
     fun toTaskContext(v: String?): TaskContext? = v?.let { TaskContext.valueOf(it) }
+
+    // ── EffortLevel enum ─────────────────────────────────────────────────────
+    @TypeConverter
+    fun fromEffortLevel(v: EffortLevel?): String? = v?.name
+
+    @TypeConverter
+    fun toEffortLevel(v: String?): EffortLevel? = v?.let { EffortLevel.valueOf(it) }
 }

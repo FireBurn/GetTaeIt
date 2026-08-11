@@ -81,6 +81,7 @@ import uk.co.fireburn.gettaeit.R
 import uk.co.fireburn.gettaeit.shared.data.RecurrenceType
 import uk.co.fireburn.gettaeit.shared.data.TaskContext
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
+import uk.co.fireburn.gettaeit.shared.data.EffortLevel
 import uk.co.fireburn.gettaeit.shared.domain.AppMode
 import uk.co.fireburn.gettaeit.shared.domain.DependencyGraph
 import uk.co.fireburn.gettaeit.shared.domain.RecurrenceEngine
@@ -673,6 +674,13 @@ private fun ParentFooterCard(
                         if (totalCount == 0) MetaChip(
                             Icons.Filled.Timer,
                             formatMinutes(mins),
+                            accent
+                        )
+                    }
+                    if (task.effortLevel != EffortLevel.MEDIUM) {
+                        MetaChip(
+                            Icons.Filled.WbSunny,
+                            if (task.effortLevel == EffortLevel.LOW) "Low effort" else "High effort",
                             accent
                         )
                     }

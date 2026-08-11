@@ -41,7 +41,7 @@ codebase. Validate each item on a physical device before marking it complete.
   never silently change a reminder schedule.
 - [x] Add an “energy/time available” check-in to filter the next task by
   estimated duration, including a low-energy option.
-- [ ] Let users set an explicit effort level rather than inferring low effort
+- [x] Let users set an explicit effort level rather than inferring low effort
   solely from duration.
 - [x] Add a weekly review: completed wins, deferred tasks, stale tasks, and a
   simple reschedule/archival path that avoids guilt-inducing language.

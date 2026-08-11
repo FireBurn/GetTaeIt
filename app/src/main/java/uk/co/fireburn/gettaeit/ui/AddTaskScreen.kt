@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import uk.co.fireburn.gettaeit.shared.data.MissedBehaviour
+import uk.co.fireburn.gettaeit.shared.data.EffortLevel
 import uk.co.fireburn.gettaeit.shared.data.RecurrenceType
 import uk.co.fireburn.gettaeit.shared.data.TaskContext
 import java.util.Calendar
@@ -193,6 +194,22 @@ fun AddTaskScreen(
                             label = { Text(label, style = MaterialTheme.typography.labelSmall) }
                         )
                     }
+            }
+
+            // ── Effort ───────────────────────────────────────────────────────
+            SectionLabel("How much energy will this take?")
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(
+                    EffortLevel.LOW to "Low",
+                    EffortLevel.MEDIUM to "Medium",
+                    EffortLevel.HIGH to "High"
+                ).forEach { (effort, label) ->
+                    FilterChip(
+                        selected = state.effortLevel == effort,
+                        onClick = { viewModel.updateAddTaskState { copy(effortLevel = effort) } },
+                        label = { Text(label) }
+                    )
+                }
             }
 
             // ── Recurrence ───────────────────────────────────────────────────
