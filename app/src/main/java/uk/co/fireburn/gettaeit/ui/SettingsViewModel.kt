@@ -115,4 +115,8 @@ class SettingsViewModel @Inject constructor(
             )
         }
     }
+
+    fun setWearHapticsEnabled(enabled: Boolean) {
+        viewModelScope.launch { userPreferencesRepository.updateUserPreferences(userPreferences.first().copy(wearHapticsEnabled = enabled)) }
+    }
 }

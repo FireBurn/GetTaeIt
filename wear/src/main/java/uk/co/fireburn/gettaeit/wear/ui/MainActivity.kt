@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
 fun WearApp(viewModel: WearViewModel = hiltViewModel()) {
     val tasks by viewModel.tasks.collectAsState()
     val isSendingVoice by viewModel.isSendingVoice.collectAsState()
+    val hapticsEnabled by viewModel.hapticsEnabled.collectAsState()
     var voiceStatusMsg by remember { mutableStateOf<String?>(null) }
 
     // Voice input launcher — opens the watch's built-in speech recognition
@@ -73,6 +74,7 @@ fun WearApp(viewModel: WearViewModel = hiltViewModel()) {
     }
 
     fun startVoiceInput() {
+        viewModel.startHaptic()
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
@@ -91,6 +93,11 @@ fun WearApp(viewModel: WearViewModel = hiltViewModel()) {
                     style = MaterialTheme.typography.title3,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
+            }
+            item {
+                Button(onClick = viewModel::toggleHaptics, modifier = Modifier.fillMaxWidth().height(36.dp)) {
+                    Text(if (hapticsEnabled) "Haptics: on" else "Haptics: off", fontSize = 12.sp)
+                }
             }
 
             // Mic button at top for quick voice task capture

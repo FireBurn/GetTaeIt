@@ -20,6 +20,7 @@ data class UserPreferences(
     val workSsid: String? = null,
     val homeSsid: String? = null,
     val isVacationMode: Boolean = false,
+    val wearHapticsEnabled: Boolean = true,
     /** JSON list of user-created [RoutineTemplate]s; kept with the user's other local preferences. */
     val routineTemplatesJson: String = "[]"
 ) {
