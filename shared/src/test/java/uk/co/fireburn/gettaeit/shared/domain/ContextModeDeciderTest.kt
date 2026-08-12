@@ -10,7 +10,7 @@ class ContextModeDeciderTest {
     fun `work hours select work mode`() {
         assertEquals(
             AppMode.WORK,
-            ContextModeDecider.decide(UserPreferences(), false, null, at(Calendar.MONDAY, 10))
+            ContextModeDecider.decide(UserPreferences(), false, null, false, at(Calendar.MONDAY, 10))
         )
     }
 
@@ -19,7 +19,7 @@ class ContextModeDeciderTest {
         assertEquals(
             AppMode.WORK,
             ContextModeDecider.decide(
-                UserPreferences(workSsid = "Office"), false, "office", at(Calendar.SUNDAY, 20)
+                UserPreferences(workSsid = "Office"), false, "office", false, at(Calendar.SUNDAY, 20)
             )
         )
     }
@@ -32,6 +32,7 @@ class ContextModeDeciderTest {
                 UserPreferences(isVacationMode = true, workSsid = "Office"),
                 isAtWorkLocation = true,
                 currentSsid = "Office",
+                isCarMode = true, // Vacation beats everything
                 now = at(Calendar.MONDAY, 10)
             )
         )
@@ -41,7 +42,15 @@ class ContextModeDeciderTest {
     fun `hour before work is commute mode`() {
         assertEquals(
             AppMode.COMMUTE,
-            ContextModeDecider.decide(UserPreferences(), false, null, at(Calendar.MONDAY, 8))
+            ContextModeDecider.decide(UserPreferences(), false, null, false, at(Calendar.MONDAY, 8))
+        )
+    }
+
+    @Test
+    fun `car mode overrides personal mode outside commute hours`() {
+        assertEquals(
+            AppMode.COMMUTE,
+            ContextModeDecider.decide(UserPreferences(), false, null, true, at(Calendar.SATURDAY, 15))
         )
     }
 

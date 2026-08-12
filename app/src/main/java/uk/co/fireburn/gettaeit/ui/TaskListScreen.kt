@@ -78,6 +78,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -344,6 +346,9 @@ private fun BrandHeader(
             )
             AssistChip(
                 onClick = {},
+                modifier = Modifier.clearAndSetSemantics { 
+                    contentDescription = "Current Level $level" 
+                },
                 label = { Text("Lvl $level", fontWeight = FontWeight.Bold) },
                 colors = AssistChipDefaults.assistChipColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,

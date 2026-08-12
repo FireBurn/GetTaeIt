@@ -9,11 +9,14 @@ object ContextModeDecider {
         preferences: UserPreferences,
         isAtWorkLocation: Boolean,
         currentSsid: String?,
+        isCarMode: Boolean,
         now: Calendar
     ): AppMode {
         // Vacation is an explicit boundary. Location and Wi-Fi must not pull a
         // user back into work mode while it is enabled.
         if (preferences.isVacationMode) return AppMode.PERSONAL
+
+        if (isCarMode) return AppMode.COMMUTE
 
         val dayOfWeek = now.get(Calendar.DAY_OF_WEEK)
         val currentHour = now.get(Calendar.HOUR_OF_DAY)

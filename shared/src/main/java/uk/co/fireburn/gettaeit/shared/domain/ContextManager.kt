@@ -14,6 +14,8 @@ import uk.co.fireburn.gettaeit.shared.data.UserPreferences
 import javax.inject.Inject
 import javax.inject.Singleton
 
+import kotlinx.coroutines.channels.awaitClose
+
 enum class AppMode {
     WORK,
     PERSONAL,
@@ -82,18 +84,46 @@ class ContextManager @Inject constructor(
 
     private val _lastKnownWifiSsid = MutableStateFlow<String?>(null)
 
+    private val isCarModeFlow: Flow<Boolean> = kotlinx.coroutines.flow.callbackFlow {
+        val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as android.app.UiModeManager
+        val isInitiallyCarMode = uiModeManager.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_CAR
+        trySend(isInitiallyCarMode)
+
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: android.content.Intent) {
+                if (intent.action == android.app.UiModeManager.ACTION_ENTER_CAR_MODE) {
+                    trySend(true)
+                } else if (intent.action == android.app.UiModeManager.ACTION_EXIT_CAR_MODE) {
+                    trySend(false)
+                }
+            }
+        }
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.app.UiModeManager.ACTION_ENTER_CAR_MODE)
+            addAction(android.app.UiModeManager.ACTION_EXIT_CAR_MODE)
+        }
+        // In modern Android we should export it or not, but for system broadcasts it's fine.
+        context.registerReceiver(receiver, filter)
+
+        awaitClose {
+            context.unregisterReceiver(receiver)
+        }
+    }
+
     /**
      * Emits the current AppMode based on time, location, WiFi, and other signals.
      */
     val appMode: Flow<AppMode> = combine(
         userPreferencesRepository.getUserPreferences(),
         geofenceManager.isAtWorkLocation,
-        _lastKnownWifiSsid
-    ) { prefs, isAtWork, currentSsid ->
+        _lastKnownWifiSsid,
+        isCarModeFlow
+    ) { prefs, isAtWork, currentSsid, isCarMode ->
         ContextModeDecider.decide(
             preferences = prefs,
             isAtWorkLocation = isAtWork,
             currentSsid = currentSsid,
+            isCarMode = isCarMode,
             now = java.util.Calendar.getInstance()
         )
     }

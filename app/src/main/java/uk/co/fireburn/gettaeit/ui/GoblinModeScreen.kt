@@ -235,7 +235,7 @@ private fun FocusSessionCard(
                         modifier = Modifier.padding(top = 16.dp, bottom = 16.dp).size(120.dp)
                     ) {
                         androidx.compose.material3.CircularProgressIndicator(
-                            progress = progress,
+                            progress = { progress },
                             modifier = Modifier.fillMaxSize(),
                             strokeWidth = 8.dp,
                             color = MaterialTheme.colorScheme.primary,
