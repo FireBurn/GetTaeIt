@@ -21,6 +21,9 @@ data class UserPreferences(
     val homeSsid: String? = null,
     val isVacationMode: Boolean = false,
     val wearHapticsEnabled: Boolean = true,
+    val xp: Int = 0,
+    val dailySpoons: Int = 5,
+    val lastSpoonUpdateDate: Long = 0L,
     /** JSON list of user-created [RoutineTemplate]s; kept with the user's other local preferences. */
     val routineTemplatesJson: String = "[]"
 ) {

@@ -114,6 +114,7 @@ androidx-wear-tiles-material = { group = "androidx.wear.tiles", name = "tiles-ma
 androidx-wear-input = { group = "androidx.wear", name = "wear-input", version.ref = "wearInput" }
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 maps-compose = { group = "com.google.maps.android", name = "maps-compose", version.ref = "mapsCompose" }
+androidx-wear-watchface-complications-data-source-ktx = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version = "1.2.1" }
 
 [plugins]
 # Define standard plugin IDs

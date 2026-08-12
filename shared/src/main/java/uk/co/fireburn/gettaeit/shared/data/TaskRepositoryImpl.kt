@@ -88,18 +88,22 @@ class TaskRepositoryImpl @Inject constructor(
     // (when signed in) happens fire-and-forget afterwards and never blocks the UI.
 
     override suspend fun addTask(task: TaskEntity) {
-        taskDao.insert(task)
-        firestoreTaskSync.push(task)
+        val updatedTask = task.copy(updatedAt = System.currentTimeMillis())
+        taskDao.insert(updatedTask)
+        firestoreTaskSync.push(updatedTask)
     }
 
     override suspend fun addAll(tasks: List<TaskEntity>) {
-        taskDao.insertAll(tasks)
-        tasks.forEach { firestoreTaskSync.push(it) }
+        val now = System.currentTimeMillis()
+        val updatedTasks = tasks.map { it.copy(updatedAt = now) }
+        taskDao.insertAll(updatedTasks)
+        updatedTasks.forEach { firestoreTaskSync.push(it) }
     }
 
     override suspend fun updateTask(task: TaskEntity) {
-        taskDao.update(task)
-        firestoreTaskSync.push(task)
+        val updatedTask = task.copy(updatedAt = System.currentTimeMillis())
+        taskDao.update(updatedTask)
+        firestoreTaskSync.push(updatedTask)
     }
 
     override suspend fun deleteTask(task: TaskEntity) {
@@ -111,13 +115,13 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override suspend fun archiveTask(task: TaskEntity) {
-        val archived = task.copy(isArchived = true, isSnoozed = false, snoozedUntil = null)
+        val archived = task.copy(isArchived = true, isSnoozed = false, snoozedUntil = null, updatedAt = System.currentTimeMillis())
         taskDao.update(archived)
         firestoreTaskSync.push(archived)
     }
 
     override suspend fun unarchiveTask(task: TaskEntity) {
-        val restored = task.copy(isArchived = false)
+        val restored = task.copy(isArchived = false, updatedAt = System.currentTimeMillis())
         taskDao.update(restored)
         firestoreTaskSync.push(restored)
     }
@@ -136,7 +140,8 @@ class TaskRepositoryImpl @Inject constructor(
             nextOccurrenceAt = nextOccurrence,
             // Streak: award if completed today and streak was maintained
             streakCount = calculateStreak(task, now),
-            lastStreakDate = now
+            lastStreakDate = now,
+            updatedAt = now
         )
         taskDao.update(updated)
         firestoreTaskSync.push(updated)
@@ -146,7 +151,8 @@ class TaskRepositoryImpl @Inject constructor(
         val updated = task.copy(
             isCompleted = false,
             completedAt = null,
-            nextOccurrenceAt = null
+            nextOccurrenceAt = null,
+            updatedAt = System.currentTimeMillis()
         )
         taskDao.update(updated)
         firestoreTaskSync.push(updated)
@@ -155,7 +161,7 @@ class TaskRepositoryImpl @Inject constructor(
     // ─── Snooze ─────────────────────────────────────────────────────────────
 
     override suspend fun snoozeTask(task: TaskEntity, untilMs: Long) {
-        val updated = task.copy(isSnoozed = true, snoozedUntil = untilMs)
+        val updated = task.copy(isSnoozed = true, snoozedUntil = untilMs, updatedAt = System.currentTimeMillis())
         taskDao.update(updated)
         firestoreTaskSync.push(updated)
     }
@@ -166,9 +172,24 @@ class TaskRepositoryImpl @Inject constructor(
         val now = System.currentTimeMillis()
         val due = taskDao.getRecurrencesDue(now)
         due.forEach { task ->
-            val updated = recurrenceEngine.resetForNextOccurrence(task)
+            val updated = recurrenceEngine.resetForNextOccurrence(task).copy(updatedAt = now)
             taskDao.update(updated)
             firestoreTaskSync.push(updated)
+        }
+    }
+
+    override suspend fun archiveStaleTasks() {
+        val now = System.currentTimeMillis()
+        val thirtyDaysMs = 30L * 24 * 60 * 60 * 1000
+        val threshold = now - thirtyDaysMs
+        
+        // Find tasks that haven't been touched in 30 days and aren't already archived or completed
+        val staleTasks = taskDao.getAllTasksOnce().filter { 
+            !it.isArchived && !it.isCompleted && it.updatedAt < threshold 
+        }
+        
+        staleTasks.forEach { task ->
+            archiveTask(task)
         }
     }
 

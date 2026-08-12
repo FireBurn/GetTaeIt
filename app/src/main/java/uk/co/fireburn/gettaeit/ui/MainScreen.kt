@@ -57,6 +57,7 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
             onSnooze = viewModel::snoozeTask,
             onStartFocus = viewModel::startFocusSession,
             onStopFocus = viewModel::stopFocusSession,
+            onMakeSmaller = viewModel::makeTaskSmaller,
             onExit = { viewModel.setGoblinMode(false) }
         )
         return

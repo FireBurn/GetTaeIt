@@ -112,5 +112,7 @@ data class TaskEntity(
     // Gamification
     val xpValue: Int = 10,
     val streakCount: Int = 0,
-    val lastStreakDate: Long? = null
+    val lastStreakDate: Long? = null,
+    
+    val updatedAt: Long = System.currentTimeMillis()
 )

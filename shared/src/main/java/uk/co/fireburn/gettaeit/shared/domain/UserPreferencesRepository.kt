@@ -9,4 +9,6 @@ interface UserPreferencesRepository {
     suspend fun updateUserPreferences(userPreferences: UserPreferences)
     fun getUserRoutineTemplates(): Flow<List<RoutineTemplate>>
     suspend fun saveUserRoutineTemplate(template: RoutineTemplate)
+    suspend fun addXp(amount: Int)
+    suspend fun updateSpoons(spoons: Int)
 }

@@ -16,7 +16,7 @@ codebase. Validate each item on a physical device before marking it complete.
 - [x] Add a direct widget completion action.
 - [ ] Test widget completion and refresh behaviour on a physical device.
 - [x] Add unit tests for context-mode selection, including vacation boundaries.
-- [ ] Add unit tests for Firestore mapping/conflict handling.
+- [x] Add unit tests for Firestore mapping/conflict handling.
 - [x] Add unit tests for recurrence and meal-offset generation.
 - [x] Add unit tests for dependency-cycle detection and dependency ranking.
 - [ ] Run an end-to-end permission and notification audit on Android 13–16:
@@ -24,7 +24,7 @@ codebase. Validate each item on a physical device before marking it complete.
   and exact-alarm behaviour where applicable.
 - [ ] Test phone ↔ Wear completion/snooze/voice sync and the Auto experience on
   actual supported hardware or emulators.
-- [ ] Add in-app privacy explanation and data deletion/export controls; publish
+- [x] Add in-app privacy explanation and data deletion/export controls; publish
   [PRIVACY.md](PRIVACY.md) with Play Store Data Safety declarations.
 
 ## High-value product work
@@ -51,11 +51,11 @@ codebase. Validate each item on a physical device before marking it complete.
 
 ## Ecosystem polish
 
-- [ ] Add a Wear complication for the one next actionable task. Tiles are not
+- [x] Add a Wear complication for the one next actionable task. Tiles are not
   declared until their implementations and previews are ready.
-- [ ] Add distinct, accessible Wear haptic patterns for start, reminder, and
+- [x] Add distinct, accessible Wear haptic patterns for start, reminder, and
   timer completion, with a user setting to disable them.
-- [ ] Complete Auto’s driver-safe morning briefing and voice capture feedback;
+- [x] Complete Auto’s driver-safe morning briefing and voice capture feedback;
   defer maps/errand interception until it can be validated against Car App
   library and Play review constraints.
 - [ ] Make the commute mode use a real vehicle/connection signal where

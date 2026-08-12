@@ -67,6 +67,9 @@ dependencies {
     // Wear Input (RemoteInputHelper for voice on watch)
     implementation(libs.androidx.wear.input)
 
+    // Wear Complications
+    implementation(libs.androidx.wear.watchface.complications.data.source.ktx)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -77,4 +80,5 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
     // Coroutines Guava bridge (needed by TileService.future{})
+    implementation(libs.kotlinx.coroutines.guava)
 }

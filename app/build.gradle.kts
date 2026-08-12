@@ -83,6 +83,15 @@ dependencies {
 
     // Navigation
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.datastore.preferences)
+
+    // Data layer and JSON (needed by SettingsViewModel for Export/Delete)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.gson)
+
+    // Notifications and WorkManager
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
 
     // Core
     implementation(libs.androidx.core.ktx)

@@ -60,4 +60,7 @@ interface TaskRepository {
 
     /** Reset any recurring tasks whose nextOccurrenceAt has passed. Called by WorkManager. */
     suspend fun resetDueRecurrences()
+
+    /** Automatically archive active tasks that have been untouched for over 30 days. */
+    suspend fun archiveStaleTasks()
 }

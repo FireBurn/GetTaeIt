@@ -38,4 +38,14 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         val templates = getUserRoutineTemplates().first()
         updateUserPreferences(prefs.copy(routineTemplatesJson = gson.toJson(templates + template)))
     }
+
+    override suspend fun addXp(amount: Int) {
+        val prefs = getUserPreferences().first()
+        updateUserPreferences(prefs.copy(xp = prefs.xp + amount))
+    }
+
+    override suspend fun updateSpoons(spoons: Int) {
+        val prefs = getUserPreferences().first()
+        updateUserPreferences(prefs.copy(dailySpoons = spoons, lastSpoonUpdateDate = System.currentTimeMillis()))
+    }
 }

@@ -16,9 +16,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import uk.co.fireburn.gettaeit.notifications.ReminderScheduler
 import uk.co.fireburn.gettaeit.shared.DataLayerSync
+import uk.co.fireburn.gettaeit.shared.data.ActiveUsersSync
 import uk.co.fireburn.gettaeit.shared.data.MissedBehaviour
 import uk.co.fireburn.gettaeit.shared.data.EffortLevel
 import uk.co.fireburn.gettaeit.shared.data.RecurrenceConfig
@@ -66,7 +68,8 @@ data class AddTaskUiState(
 data class FocusSessionUiState(
     val status: FocusSessionStatus = FocusSessionStatus.IDLE,
     val totalSeconds: Int = 0,
-    val remainingSeconds: Int = 0
+    val remainingSeconds: Int = 0,
+    val activeUsersCount: Int = 0
 )
 
 enum class FocusSessionStatus { IDLE, RUNNING, COMPLETED }
@@ -80,6 +83,7 @@ class MainViewModel @Inject constructor(
     private val contextManager: ContextManager,
     private val hybridTaskService: HybridTaskService,
     private val dataLayerSync: DataLayerSync,
+    private val activeUsersSync: ActiveUsersSync,
     private val reminderScheduler: ReminderScheduler,
     @param:ApplicationContext private val appContext: Context
 ) : ViewModel() {
@@ -99,6 +103,9 @@ class MainViewModel @Inject constructor(
         userPreferencesRepository.getUserRoutineTemplates()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val userPreferences = userPreferencesRepository.getUserPreferences()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), uk.co.fireburn.gettaeit.shared.data.UserPreferences())
+
     val completedToday: StateFlow<List<TaskEntity>> = taskRepository.getCompletedToday()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -108,15 +115,21 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _dismissedSuggestionId = MutableStateFlow<UUID?>(null)
+    private val _chainedSuggestion = MutableStateFlow<AdaptiveSuggestion?>(null)
+    
     val adaptiveSuggestion: StateFlow<AdaptiveSuggestion?> = combine(
-        tasks, completedToday, reviewTasks, _dismissedSuggestionId
-    ) { active, completed, review, dismissedId ->
+        tasks, completedToday, reviewTasks, _dismissedSuggestionId, _chainedSuggestion
+    ) { active, completed, review, dismissedId, chained ->
+        if (chained != null && chained.taskId != dismissedId) return@combine chained
         AdaptiveSuggestionEngine.suggest(active, completed, review.filter { it.isSnoozed })
             ?.takeIf { it.taskId != dismissedId }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun dismissAdaptiveSuggestion(taskId: UUID) {
         _dismissedSuggestionId.value = taskId
+        if (_chainedSuggestion.value?.taskId == taskId) {
+            _chainedSuggestion.value = null
+        }
     }
 
     private val _completionCelebration = MutableStateFlow<CompletionCelebration?>(null)
@@ -148,6 +161,13 @@ class MainViewModel @Inject constructor(
             totalSeconds = totalSeconds,
             remainingSeconds = totalSeconds
         )
+        
+        activeUsersSync.registerFocusSession(totalSeconds)
+        viewModelScope.launch {
+            val count = activeUsersSync.getActiveFocusersCount()
+            _focusSession.value = _focusSession.value.copy(activeUsersCount = count)
+        }
+
         focusSessionJob = viewModelScope.launch {
             while (isActive) {
                 val remaining = ((endTimeMs - System.currentTimeMillis() + 999L) / 1_000L)
@@ -157,14 +177,15 @@ class MainViewModel @Inject constructor(
                         status = FocusSessionStatus.COMPLETED,
                         totalSeconds = totalSeconds
                     )
+                    activeUsersSync.clearFocusSession()
                     break
                 }
-                _focusSession.value = FocusSessionUiState(
+                _focusSession.value = _focusSession.value.copy(
                     status = FocusSessionStatus.RUNNING,
                     totalSeconds = totalSeconds,
                     remainingSeconds = remaining
                 )
-                delay(250)
+                kotlinx.coroutines.delay(250)
             }
         }
     }
@@ -406,15 +427,28 @@ class MainViewModel @Inject constructor(
     fun completeTask(task: TaskEntity) {
         viewModelScope.launch {
             taskRepository.completeTask(task)
+            userPreferencesRepository.addXp(task.xpValue)
             _completionCelebration.value = CompletionCelebration(task.title, task.xpValue)
             dataLayerSync.sendTaskUpdate(task.id, true)
             reminderScheduler.cancelTask(appContext, task)
+            
+            // Routine Chaining check
+            val allTasks = taskRepository.getAllActiveToplevelTasks().firstOrNull() ?: emptyList()
+            val nextTask = allTasks.firstOrNull { it.dependencyIds.contains(task.id) }
+            if (nextTask != null) {
+                _chainedSuggestion.value = AdaptiveSuggestion(
+                    taskId = nextTask.id,
+                    message = "Up next: ${nextTask.title}",
+                    explanation = "This is the next step in your routine."
+                )
+            }
         }
     }
 
     fun completeSubtask(task: TaskEntity) {
         viewModelScope.launch {
             taskRepository.completeTask(task)
+            userPreferencesRepository.addXp(task.xpValue)
             _completionCelebration.value = CompletionCelebration(task.title, task.xpValue)
             dataLayerSync.sendTaskUpdate(task.id, true)
             task.parentId?.let { taskRepository.autoCompleteParentIfDone(it) }
@@ -424,6 +458,7 @@ class MainViewModel @Inject constructor(
     fun completeTaskWithTime(task: TaskEntity, actualMinutes: Int?) {
         viewModelScope.launch {
             taskRepository.completeTask(task.copy(actualMinutes = actualMinutes))
+            userPreferencesRepository.addXp(task.xpValue)
             _completionCelebration.value = CompletionCelebration(task.title, task.xpValue)
             dataLayerSync.sendTaskUpdate(task.id, true)
             task.parentId?.let { taskRepository.autoCompleteParentIfDone(it) }
@@ -695,6 +730,12 @@ class MainViewModel @Inject constructor(
                     .forEach { reminderScheduler.scheduleTask(appContext, it) }
                 return@collect // only process first emission
             }
+        }
+    }
+
+    fun setDailySpoons(spoons: Int) {
+        viewModelScope.launch {
+            userPreferencesRepository.updateSpoons(spoons)
         }
     }
 }

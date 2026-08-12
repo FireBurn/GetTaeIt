@@ -46,6 +46,8 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -67,6 +69,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -129,6 +132,18 @@ fun TaskListScreen(
     // Best currently-active streak, for a wee bit of bragging rights in the header.
     val bestStreak = remember(tasks) { tasks.maxOfOrNull { it.streakCount } ?: 0 }
 
+    val userPrefs by viewModel.userPreferences.collectAsState()
+    
+    // Check if spoons were set today
+    val todayStart = java.util.Calendar.getInstance().apply {
+        set(java.util.Calendar.HOUR_OF_DAY, 0)
+        set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0)
+        set(java.util.Calendar.MILLISECOND, 0)
+    }.timeInMillis
+    
+    val needsSpoonUpdate = userPrefs.lastSpoonUpdateDate < todayStart
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -136,9 +151,13 @@ fun TaskListScreen(
     ) {
         BrandHeader(
             streak = bestStreak,
+            level = (userPrefs.xp / 100) + 1, // Simple leveling: 100 XP per level
             onGoblinModeClicked = onGoblinModeClicked,
             onWeeklyReviewClicked = onWeeklyReviewClicked
         )
+        if (needsSpoonUpdate) {
+            SpoonPromptCard(onSpoonsSelected = { viewModel.setDailySpoons(it) })
+        }
         ContextBanner(mode = appMode)
         completionCelebration?.let { celebration ->
             CompletionCelebrationCard(
@@ -293,6 +312,7 @@ private fun TaskNowFilterBar(
 @Composable
 private fun BrandHeader(
     streak: Int,
+    level: Int,
     onGoblinModeClicked: () -> Unit,
     onWeeklyReviewClicked: () -> Unit
 ) {
@@ -315,6 +335,15 @@ private fun BrandHeader(
                 "Get Tae It",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onBackground
+            )
+            AssistChip(
+                onClick = {},
+                label = { Text("Lvl $level", fontWeight = FontWeight.Bold) },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    labelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ),
+                border = null
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -983,4 +1012,42 @@ fun formatMinutes(minutes: Int): String = when {
     minutes < 60 -> "${minutes}m"
     minutes % 60 == 0 -> "${minutes / 60}h"
     else -> "${minutes / 60}h ${minutes % 60}m"
+}
+
+@Composable
+fun SpoonPromptCard(onSpoonsSelected: (Int) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                "How many spoons do you have today?",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                for (spoons in 1..5) {
+                    val label = when(spoons) {
+                        1 -> "1\nEmpty"
+                        2 -> "2\nLow"
+                        3 -> "3\nOkay"
+                        4 -> "4\nGood"
+                        else -> "5\nGreat"
+                    }
+                    Button(
+                        onClick = { onSpoonsSelected(spoons) },
+                        modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(label, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
 }

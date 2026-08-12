@@ -16,6 +16,7 @@ class VoiceInputAutoScreen(
             override fun onSearchSubmitted(searchTerm: String) {
                 // Send dictated text to the ViewModel to be parsed by AI
                 viewModel.addTasksFromVoice(searchTerm)
+                androidx.car.app.CarToast.makeText(carContext, "Task added!", androidx.car.app.CarToast.LENGTH_SHORT).show()
                 screenManager.pop() // Return to task list after parsing
             }
         }

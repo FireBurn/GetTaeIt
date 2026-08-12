@@ -22,11 +22,19 @@ import uk.co.fireburn.gettaeit.shared.domain.UserPreferencesRepository
 import javax.inject.Inject
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import uk.co.fireburn.gettaeit.shared.data.AppDatabase
+import uk.co.fireburn.gettaeit.shared.domain.AuthRepository
+import com.google.gson.GsonBuilder
+import android.content.Intent
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val geofenceManager: GeofenceManager,
+    private val appDatabase: AppDatabase,
+    private val authRepository: AuthRepository,
     @param:ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -118,5 +126,46 @@ class SettingsViewModel @Inject constructor(
 
     fun setWearHapticsEnabled(enabled: Boolean) {
         viewModelScope.launch { userPreferencesRepository.updateUserPreferences(userPreferences.first().copy(wearHapticsEnabled = enabled)) }
+    }
+
+    fun exportData() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    val tasks = appDatabase.taskDao().getAllTasksOnce()
+                    val prefs = userPreferences.first()
+                    
+                    val exportObj = mapOf(
+                        "preferences" to prefs,
+                        "tasks" to tasks
+                    )
+                    
+                    val gson = GsonBuilder().setPrettyPrinting().create()
+                    val json = gson.toJson(exportObj)
+                    
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_SUBJECT, "Get Tae It Data Export")
+                        putExtra(Intent.EXTRA_TEXT, json)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    
+                    appContext.startActivity(Intent.createChooser(intent, "Export Data").apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
+    fun deleteAllData() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                appDatabase.clearAllTables()
+                authRepository.signOut()
+            }
+        }
     }
 }
