@@ -25,7 +25,8 @@ data class UserPreferences(
     val dailySpoons: Int = 5,
     val lastSpoonUpdateDate: Long = 0L,
     /** JSON list of user-created [RoutineTemplate]s; kept with the user's other local preferences. */
-    val routineTemplatesJson: String = "[]"
+    val routineTemplatesJson: String = "[]",
+    val unlockedStickersJson: String = "[]"
 ) {
     val workLocationLatLng: Pair<Double, Double>?
         get() = workLocationString?.split(',')?.let {

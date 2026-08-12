@@ -51,6 +51,11 @@ internal class TaskListWidget(
             context.applicationContext,
             DataLayerEntryPoint::class.java
         ).taskRepository()
+        
+        val prefsRepository = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            DataLayerEntryPoint::class.java
+        ).userPreferencesRepository()
 
         val tasks = repository.getAllActiveToplevelTasks().first()
             .asSequence()
@@ -58,9 +63,11 @@ internal class TaskListWidget(
             .sortedWith(compareBy<TaskEntity> { it.priority }.thenBy { it.dueDate ?: Long.MAX_VALUE })
             .take(MAX_VISIBLE_TASKS)
             .toList()
+            
+        val prefs = prefsRepository.getUserPreferences().first()
 
         provideContent {
-            TaskWidgetContent(title, emptyMessage, background, tasks)
+            TaskWidgetContent(title, emptyMessage, background, tasks, prefs.xp, prefs.dailySpoons)
         }
     }
 
@@ -74,7 +81,9 @@ private fun TaskWidgetContent(
     title: String,
     emptyMessage: String,
     background: ColorProvider,
-    tasks: List<TaskEntity>
+    tasks: List<TaskEntity>,
+    xp: Int,
+    spoons: Int
 ) {
     Column(
         modifier = GlanceModifier
@@ -84,14 +93,25 @@ private fun TaskWidgetContent(
         horizontalAlignment = Alignment.Start,
         verticalAlignment = Alignment.Top
     ) {
-        Text(
-            text = title,
-            modifier = GlanceModifier.clickable(actionStartActivity<MainActivity>()),
-            style = TextStyle(
-                color = ColorProvider(android.graphics.Color.WHITE),
-                fontWeight = FontWeight.Bold
+        androidx.glance.layout.Row(
+            modifier = GlanceModifier.fillMaxWidth().clickable(actionStartActivity<MainActivity>()),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                modifier = GlanceModifier.defaultWeight(),
+                style = TextStyle(
+                    color = ColorProvider(android.graphics.Color.WHITE),
+                    fontWeight = FontWeight.Bold
+                )
             )
-        )
+            Text(
+                text = "Lvl ${xp / 1000 + 1} • 🥄 $spoons",
+                style = TextStyle(
+                    color = ColorProvider(android.graphics.Color.WHITE)
+                )
+            )
+        }
         Spacer(GlanceModifier.height(8.dp))
         if (tasks.isEmpty()) {
             Text(

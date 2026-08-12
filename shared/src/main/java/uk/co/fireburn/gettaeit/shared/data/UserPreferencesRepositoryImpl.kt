@@ -48,4 +48,15 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         val prefs = getUserPreferences().first()
         updateUserPreferences(prefs.copy(dailySpoons = spoons, lastSpoonUpdateDate = System.currentTimeMillis()))
     }
+
+    override suspend fun unlockSticker(stickerId: String) {
+        val prefs = getUserPreferences().first()
+        val currentStickers = runCatching {
+            gson.fromJson<List<String>>(prefs.unlockedStickersJson, object : TypeToken<List<String>>() {}.type) ?: emptyList()
+        }.getOrDefault(emptyList())
+        if (!currentStickers.contains(stickerId)) {
+            val updatedStickers = currentStickers + stickerId
+            updateUserPreferences(prefs.copy(unlockedStickersJson = gson.toJson(updatedStickers)))
+        }
+    }
 }

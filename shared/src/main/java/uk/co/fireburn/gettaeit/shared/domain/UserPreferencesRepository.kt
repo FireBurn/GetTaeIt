@@ -11,4 +11,5 @@ interface UserPreferencesRepository {
     suspend fun saveUserRoutineTemplate(template: RoutineTemplate)
     suspend fun addXp(amount: Int)
     suspend fun updateSpoons(spoons: Int)
+    suspend fun unlockSticker(stickerId: String)
 }

@@ -13,4 +13,5 @@ interface DataLayerEntryPoint {
     fun taskRepository(): TaskRepository
     fun geofenceManager(): GeofenceManager
     fun hybridTaskService(): HybridTaskService
+    fun userPreferencesRepository(): uk.co.fireburn.gettaeit.shared.domain.UserPreferencesRepository
 }

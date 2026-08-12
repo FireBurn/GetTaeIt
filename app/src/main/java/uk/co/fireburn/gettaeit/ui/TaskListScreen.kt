@@ -36,6 +36,9 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Snooze
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.WbSunny
@@ -110,7 +113,8 @@ fun TaskListScreen(
     recurrenceEngine: RecurrenceEngine = hiltViewModel<MainViewModel>().let { RecurrenceEngine() },
     onAddTaskClicked: () -> Unit,
     onGoblinModeClicked: () -> Unit,
-    onWeeklyReviewClicked: () -> Unit
+    onWeeklyReviewClicked: () -> Unit,
+    onStickerBookClicked: () -> Unit
 ) {
     val tasks by viewModel.tasks.collectAsState()
     val appMode by viewModel.appMode.collectAsState()
@@ -153,7 +157,8 @@ fun TaskListScreen(
             streak = bestStreak,
             level = (userPrefs.xp / 100) + 1, // Simple leveling: 100 XP per level
             onGoblinModeClicked = onGoblinModeClicked,
-            onWeeklyReviewClicked = onWeeklyReviewClicked
+            onWeeklyReviewClicked = onWeeklyReviewClicked,
+            onStickerBookClicked = onStickerBookClicked
         )
         if (needsSpoonUpdate) {
             SpoonPromptCard(onSpoonsSelected = { viewModel.setDailySpoons(it) })
@@ -314,7 +319,8 @@ private fun BrandHeader(
     streak: Int,
     level: Int,
     onGoblinModeClicked: () -> Unit,
-    onWeeklyReviewClicked: () -> Unit
+    onWeeklyReviewClicked: () -> Unit,
+    onStickerBookClicked: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -347,6 +353,13 @@ private fun BrandHeader(
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onStickerBookClicked) {
+                Icon(
+                    Icons.Filled.EmojiEvents,
+                    contentDescription = "Open sticker book",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
             IconButton(onClick = onWeeklyReviewClicked) {
                 Icon(
                     Icons.Filled.CalendarMonth,

@@ -162,7 +162,8 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
                     viewModel = viewModel, // Share ViewModel
                     onAddTaskClicked = { navController.navigate("add_task") },
                     onGoblinModeClicked = { viewModel.setGoblinMode(true) },
-                    onWeeklyReviewClicked = { navController.navigate("weekly_review") }
+                    onWeeklyReviewClicked = { navController.navigate("weekly_review") },
+                    onStickerBookClicked = { navController.navigate("sticker_book") }
                 )
             }
             composable(Screen.KitchenDashboard.route) {
@@ -182,6 +183,12 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
                 VoiceInputScreen(
                     viewModel = viewModel, // Share ViewModel
                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("sticker_book") {
+                StickerBookScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable("weekly_review") {

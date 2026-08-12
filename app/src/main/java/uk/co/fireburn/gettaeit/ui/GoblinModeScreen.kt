@@ -13,6 +13,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -22,6 +23,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.background
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -156,12 +169,40 @@ private fun FocusSessionCard(
                     )
                     
                     if (session.activeUsersCount > 0) {
-                        Text(
-                            "${session.activeUsersCount} other ${if (session.activeUsersCount == 1) "person is" else "people are"} focusing right now.",
-                            modifier = Modifier.padding(top = 8.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        var showLobby by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                        
+                        androidx.compose.foundation.layout.Row(
+                            modifier = Modifier
+                                .padding(top = 12.dp)
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                .clickable { showLobby = true }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                androidx.compose.material.icons.Icons.Default.Group,
+                                contentDescription = "Lobby",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "${session.activeUsersCount} other ${if (session.activeUsersCount == 1) "person is" else "people are"} focusing right now.\nTap to enter Body Doubling Lobby.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        
+                        if (showLobby) {
+                            BodyDoublingLobbyDialog(
+                                activeUsersCount = session.activeUsersCount,
+                                onDismiss = { showLobby = false },
+                                onStartFocus = { 
+                                    showLobby = false
+                                    onStart(it) 
+                                }
+                            )
+                        }
                     }
 
                     androidx.compose.foundation.layout.Row(
@@ -242,4 +283,86 @@ private fun FocusSessionCard(
             }
         }
     }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun BodyDoublingLobbyDialog(
+    activeUsersCount: Int,
+    onDismiss: () -> Unit,
+    onStartFocus: (Int) -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(androidx.compose.material.icons.Icons.Default.Group, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+                Text("Body Doubling Lobby")
+            }
+        },
+        text = {
+            Column {
+                Text(
+                    "Knowing others are working right now can help your brain engage. You are not alone!",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                androidx.compose.foundation.layout.Spacer(Modifier.height(16.dp))
+                
+                // Generate some fake users for the lobby feel
+                val fakeNames = androidx.compose.runtime.remember { listOf("Alex", "Sam", "Jordan", "Casey", "Taylor", "Morgan", "Riley", "Drew").shuffled().take(minOf(activeUsersCount, 4).coerceAtLeast(1)) }
+                
+                fakeNames.forEach { name ->
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(name.take(1), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                        androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
+                        Text(name, fontWeight = FontWeight.Medium)
+                        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                        Text("Focusing", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                
+                if (activeUsersCount > fakeNames.size) {
+                    Text(
+                        "...and ${activeUsersCount - fakeNames.size} others",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp, start = 44.dp)
+                    )
+                }
+                
+                androidx.compose.foundation.layout.Spacer(Modifier.height(24.dp))
+                Text("Join them:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier.padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(5, 15, 25).forEach { minutes ->
+                        AssistChip(
+                            onClick = { onStartFocus(minutes) },
+                            label = { Text("$minutes m") },
+                            colors = AssistChipDefaults.assistChipColors()
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
 }

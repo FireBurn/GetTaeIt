@@ -432,6 +432,11 @@ class MainViewModel @Inject constructor(
             dataLayerSync.sendTaskUpdate(task.id, true)
             reminderScheduler.cancelTask(appContext, task)
             
+            if (kotlin.random.Random.nextFloat() < 0.3f) { // 30% chance to unlock a sticker!
+                val sticker = listOf("sticker_wizard", "sticker_knight", "sticker_spoon").random()
+                userPreferencesRepository.unlockSticker(sticker)
+            }
+            
             // Routine Chaining check
             val allTasks = taskRepository.getAllActiveToplevelTasks().firstOrNull() ?: emptyList()
             val nextTask = allTasks.firstOrNull { it.dependencyIds.contains(task.id) }
