@@ -33,6 +33,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import uk.co.fireburn.gettaeit.ui.navigation.Screen
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 
 @Composable
 fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
@@ -63,43 +68,17 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
         return
     }
 
-    Scaffold(
-        floatingActionButton = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.End
-            ) {
-                // Smaller mic FAB
-                SmallFloatingActionButton(
-                    onClick = { navController.navigate("voice_add_task") },
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    elevation = FloatingActionButtonDefaults.elevation(6.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Mic,
-                        contentDescription = "Add by voice",
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                // Primary add FAB
-                FloatingActionButton(
-                    onClick = { showQuickCapture = true },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    elevation = FloatingActionButtonDefaults.elevation(8.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Quick capture")
-                }
-            }
-        },
-        bottomBar = {
-            NavigationBar {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentDestination = navBackStackEntry?.destination
+    val isWideScreen = LocalConfiguration.current.screenWidthDp > 600
 
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+
+    Row {
+        if (isWideScreen) {
+            NavigationRail {
+                Spacer(Modifier.weight(1f))
                 navItems.forEach { screen ->
-                    NavigationBarItem(
+                    NavigationRailItem(
                         icon = { Icon(screen.icon, contentDescription = screen.label) },
                         label = { Text(screen.label) },
                         selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
@@ -114,15 +93,70 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
                         }
                     )
                 }
+                Spacer(Modifier.weight(1f))
             }
         }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.TaskList.route,
-            // Only pad the bottom to avoid double-padding the TopAppBar
-            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
-        ) {
+
+        Scaffold(
+            floatingActionButton = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    // Smaller mic FAB
+                    SmallFloatingActionButton(
+                        onClick = { navController.navigate("voice_add_task") },
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        elevation = FloatingActionButtonDefaults.elevation(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Mic,
+                            contentDescription = "Add by voice",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    // Primary add FAB
+                    FloatingActionButton(
+                        onClick = { showQuickCapture = true },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        elevation = FloatingActionButtonDefaults.elevation(8.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Quick capture")
+                    }
+                }
+            },
+            bottomBar = {
+                if (!isWideScreen) {
+                    NavigationBar {
+                        navItems.forEach { screen ->
+                            NavigationBarItem(
+                                icon = { Icon(screen.icon, contentDescription = screen.label) },
+                                label = { Text(screen.label) },
+                                selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                                onClick = {
+                                    navController.navigate(screen.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = Screen.TaskList.route,
+                modifier = Modifier.padding(
+                    bottom = if (isWideScreen) 0.dp else innerPadding.calculateBottomPadding()
+                )
+            ) {
             composable(Screen.TaskList.route) {
                 TaskListScreen(
                     viewModel = viewModel, // Share ViewModel
@@ -158,7 +192,7 @@ fun MainScreen(viewModel: MainViewModel = hiltViewModel()) {
             }
         }
     }
-
+    }
     if (showQuickCapture) {
         QuickCaptureDialog(
             onSave = {
