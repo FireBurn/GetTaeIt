@@ -469,7 +469,7 @@ class GeminiNanoStrategy @Inject constructor(
             val responseText = response.candidates.firstOrNull()?.text ?: ""
             Log.i(TAG, "ML Kit parse response:\n$responseText")
 
-            var mainTitle = "New Task"
+            var mainTitle = prompt.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
             var mainContext = TaskContext.PERSONAL
             var mainMins: Int? = null
             val parsedSubtasks = mutableListOf<BreakdownResult>()

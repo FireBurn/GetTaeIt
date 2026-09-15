@@ -128,6 +128,8 @@ fun VoiceInputScreen(
             )
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            // Attempt to bypass Google's online privacy toast by using offline mode
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
         }
     }
 
@@ -158,12 +160,13 @@ fun VoiceInputScreen(
             override fun onResults(results: Bundle?) {
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 if (!matches.isNullOrEmpty()) {
-                    recognizedText = matches[0]
-                    editableText = matches[0]
+                    val capitalized = matches[0].replaceFirstChar { it.uppercase() }
+                    recognizedText = capitalized
+                    editableText = capitalized
                     hasResult = true
-                    pendingVoiceText = matches[0]
+                    pendingVoiceText = capitalized
                     awaitingScheduleRoute = true
-                    viewModel.parseVoiceForSchedule(matches[0])
+                    viewModel.parseVoiceForSchedule(capitalized)
                 }
                 isListening = false
             }
@@ -171,7 +174,7 @@ fun VoiceInputScreen(
             override fun onPartialResults(partialResults: Bundle?) {
                 val partial =
                     partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                if (!partial.isNullOrEmpty()) editableText = partial[0]
+                if (!partial.isNullOrEmpty()) editableText = partial[0].replaceFirstChar { it.uppercase() }
             }
 
             override fun onEvent(eventType: Int, params: Bundle?) {}
@@ -309,10 +312,6 @@ fun VoiceInputScreen(
             onDismissRequest = {
                 showScheduleSheet = false
                 viewModel.clearVoiceScheduleSuggestion()
-                viewModel.addTasksFromVoice(
-                    pendingVoiceText,
-                    recurrenceOverride = RecurrenceConfig(type = RecurrenceType.NONE)
-                ) { onNavigateBack() }
             },
             sheetState = scheduleSheetState
         ) {
