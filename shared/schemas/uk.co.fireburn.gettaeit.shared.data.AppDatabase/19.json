@@ -1,0 +1,325 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 19,
+    "identityHash": "e53631a1cb1eaf7cc8b2d32fc8881c05",
+    "entities": [
+      {
+        "tableName": "tasks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT, `frictionNote` TEXT, `context` TEXT NOT NULL, `priority` INTEGER NOT NULL, `effortLevel` TEXT NOT NULL, `isCompleted` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `completedAt` INTEGER, `isSnoozed` INTEGER NOT NULL, `snoozedUntil` INTEGER, `dueDate` INTEGER, `recurrence` TEXT NOT NULL, `nextOccurrenceAt` INTEGER, `parentId` TEXT, `dependencyIds` TEXT NOT NULL, `isSubtask` INTEGER NOT NULL, `locationTrigger` TEXT, `wifiTrigger` TEXT, `offsetReferenceId` TEXT, `offsetDuration` INTEGER, `estimatedMinutes` INTEGER, `actualMinutes` INTEGER, `xpValue` INTEGER NOT NULL, `streakCount` INTEGER NOT NULL, `lastStreakDate` INTEGER, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "frictionNote",
+            "columnName": "frictionNote",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "context",
+            "columnName": "context",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priority",
+            "columnName": "priority",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "effortLevel",
+            "columnName": "effortLevel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isCompleted",
+            "columnName": "isCompleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completedAt",
+            "columnName": "completedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isSnoozed",
+            "columnName": "isSnoozed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "snoozedUntil",
+            "columnName": "snoozedUntil",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "dueDate",
+            "columnName": "dueDate",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "recurrence",
+            "columnName": "recurrence",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nextOccurrenceAt",
+            "columnName": "nextOccurrenceAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "parentId",
+            "columnName": "parentId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "dependencyIds",
+            "columnName": "dependencyIds",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSubtask",
+            "columnName": "isSubtask",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "locationTrigger",
+            "columnName": "locationTrigger",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "wifiTrigger",
+            "columnName": "wifiTrigger",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "offsetReferenceId",
+            "columnName": "offsetReferenceId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "offsetDuration",
+            "columnName": "offsetDuration",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "estimatedMinutes",
+            "columnName": "estimatedMinutes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "actualMinutes",
+            "columnName": "actualMinutes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "xpValue",
+            "columnName": "xpValue",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "streakCount",
+            "columnName": "streakCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastStreakDate",
+            "columnName": "lastStreakDate",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "user_preferences",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `workLocationString` TEXT, `workLocationRadius` REAL NOT NULL, `workSsid` TEXT, `homeSsid` TEXT, `isVacationMode` INTEGER NOT NULL, `wearHapticsEnabled` INTEGER NOT NULL, `xp` INTEGER NOT NULL, `dailySpoons` INTEGER NOT NULL, `lastSpoonUpdateDate` INTEGER NOT NULL, `routineTemplatesJson` TEXT NOT NULL, `unlockedStickersJson` TEXT NOT NULL, `startHour` INTEGER NOT NULL, `endHour` INTEGER NOT NULL, `workingDays` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "workLocationString",
+            "columnName": "workLocationString",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "workLocationRadius",
+            "columnName": "workLocationRadius",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "workSsid",
+            "columnName": "workSsid",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "homeSsid",
+            "columnName": "homeSsid",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isVacationMode",
+            "columnName": "isVacationMode",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wearHapticsEnabled",
+            "columnName": "wearHapticsEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "xp",
+            "columnName": "xp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dailySpoons",
+            "columnName": "dailySpoons",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSpoonUpdateDate",
+            "columnName": "lastSpoonUpdateDate",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "routineTemplatesJson",
+            "columnName": "routineTemplatesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unlockedStickersJson",
+            "columnName": "unlockedStickersJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "workSchedule.startHour",
+            "columnName": "startHour",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "workSchedule.endHour",
+            "columnName": "endHour",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "workSchedule.workingDays",
+            "columnName": "workingDays",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "shopping_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `category` TEXT NOT NULL, `isBought` INTEGER NOT NULL, `supermarket` TEXT, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isBought",
+            "columnName": "isBought",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "supermarket",
+            "columnName": "supermarket",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e53631a1cb1eaf7cc8b2d32fc8881c05')"
+    ]
+  }
+}

@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
 }
 
 android {
@@ -26,10 +27,38 @@ android {
     kotlin {
         jvmToolchain(17)
     }
+
+    // Migration tests run on the JVM under Robolectric and read the exported schemas as assets.
+    sourceSets {
+        getByName("test").assets.srcDir("$projectDir/schemas")
+    }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+}
+
+// Every schema version is checked in so MigrationTestHelper can build old databases.
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
+// Robolectric's Android 16 sandbox needs a Java 21 runtime; the code itself still targets 17.
+tasks.withType<Test>().configureEach {
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    // Robolectric reaches into FileDescriptor and friends, which the module system hides by default.
+    jvmArgs(
+        "--add-opens=java.base/java.io=ALL-UNNAMED",
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED"
+    )
 }
 
 dependencies {
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.room.testing)
+    testImplementation(libs.kotlinx.coroutines.test)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
