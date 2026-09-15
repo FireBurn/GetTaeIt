@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "uk.co.fireburn.gettaeit.wear"
     compileSdk = 37
+    ndkVersion = libs.versions.ndk.get()
 
     defaultConfig {
         applicationId = "uk.co.fireburn.gettaeit.wear"

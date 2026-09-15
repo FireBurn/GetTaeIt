@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "uk.co.fireburn.gettaeit.shared"
     compileSdk = 37
+    ndkVersion = libs.versions.ndk.get()
 
     defaultConfig {
         minSdk = 26

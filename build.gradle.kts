@@ -10,7 +10,7 @@ plugins {
     alias(libs.plugins.google.services) apply false
 }
 
-// Dagger/Hilt 2.59.2 bundles a kotlin-metadata-jvm that can't parse Kotlin 2.4.0
+// Dagger/Hilt 2.60.1 bundles a kotlin-metadata-jvm (2.3.21) that can't parse Kotlin 2.4
 // metadata. It's unshaded since Dagger 2.57, so force the matching version here
 // rather than pin the whole project back to an older Kotlin.
 subprojects {

@@ -1,52 +1,52 @@
 [versions]
 # Build Constants
-androidGradlePlugin = "9.2.0"
-kotlin = "2.4.10"
-ksp = "2.3.9"
-# Dagger 2.59.2's bundled kotlin-metadata-jvm only understands metadata up to
-# Kotlin 2.3.0. Since Dagger 2.57 it's unshaded, so we can force the version
+androidGradlePlugin = "9.4.0"
+kotlin = "2.4.20"
+ksp = "2.3.12"
+# NDK r30 (stable). No native code of our own, but AGP uses it to strip the
+# prebuilt .so files that come in with ML Kit and Play Services.
+ndk = "30.0.16248370"
+# Dagger 2.60.1's bundled kotlin-metadata-jvm only understands metadata up to
+# Kotlin 2.3.21. Since Dagger 2.57 it's unshaded, so we can force the version
 # that actually matches our Kotlin version instead of waiting for a Dagger release.
-kotlinMetadataJvm = "2.4.10"
-hilt = "2.59.2"
+kotlinMetadataJvm = "2.4.20"
+hilt = "2.60.1"
 googleServices = "4.5.0"
-firebaseCrashlyticsPlugin = "3.0.2"
 
 # AndroidX
-coreKtx = "1.15.0"
+coreKtx = "1.19.0"
 lifecycleRuntimeKtx = "2.11.0"
 lifecycleViewmodelKtx = "2.11.0"
 activityCompose = "1.13.0"
-navigationCompose = "2.9.8"
+navigationCompose = "2.10.1"
 hiltNavigationCompose = "1.4.0"
 workRuntimeKtx = "2.11.2"
-room = "2.8.4"
+room = "2.8.5"
 datastorePreferences = "1.2.1"
 carApp = "1.7.0"
 wearCompose = "1.6.2"
 wearTiles = "1.6.2"
 wearInput = "1.2.0"
+wearComplications = "1.3.0"
 
 # Compose
-composeBom = "2026.06.00"
+composeBom = "2026.09.00"
 
 # Firebase & Play Services
-firebaseBom = "34.16.0"
+firebaseBom = "34.19.0"
 playServicesLocation = "21.4.0"
-playServicesAuth = "21.3.0"
-playServicesMaps = "19.0.0"
 playServicesWearable = "20.0.1"
 
 # Third Party
-mlkitGenai = "1.0.0-beta2"
-gson = "2.11.0"
-materialIconsExtended = "1.7.8"
-kotlinxSerializationJson = "1.8.0"
+# genai-prompt has not had a stable release yet; this is the newest published build.
+mlkitGenai = "1.0.0-beta4"
+gson = "2.14.0"
+kotlinxSerializationJson = "1.11.0"
 coroutines = "1.11.0"
 accompanist = "0.37.3"
-mapsCompose = "6.1.0"
 credentialManager = "1.6.0"
-googleId = "1.1.1"
-glance = "1.1.1"
+googleId = "1.2.0"
+glance = "1.2.0"
 junit = "4.13.2"
 
 [libraries]
@@ -87,7 +87,6 @@ kotlinx-coroutines-guava = { group = "org.jetbrains.kotlinx", name = "kotlinx-co
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-firestore-ktx = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-auth-ktx = { group = "com.google.firebase", name = "firebase-auth" }
-firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
 
 # Sign-in (Credential Manager + Google ID token)
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentialManager" }
@@ -101,11 +100,9 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 # Play Services
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
-play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
-play-services-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "playServicesMaps" }
 play-services-wearable = { group = "com.google.android.gms", name = "play-services-wearable", version.ref = "playServicesWearable" }
 
-# Car, Wear & Maps
+# Car & Wear
 androidx-car-app = { group = "androidx.car.app", name = "app", version.ref = "carApp" }
 androidx-wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wearCompose" }
 androidx-wear-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "wearCompose" }
@@ -113,17 +110,14 @@ androidx-wear-tiles = { group = "androidx.wear.tiles", name = "tiles", version.r
 androidx-wear-tiles-material = { group = "androidx.wear.tiles", name = "tiles-material", version.ref = "wearTiles" }
 androidx-wear-input = { group = "androidx.wear", name = "wear-input", version.ref = "wearInput" }
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
-maps-compose = { group = "com.google.maps.android", name = "maps-compose", version.ref = "mapsCompose" }
-androidx-wear-watchface-complications-data-source-ktx = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version = "1.2.1" }
+androidx-wear-watchface-complications-data-source-ktx = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version.ref = "wearComplications" }
 
 [plugins]
 # Define standard plugin IDs
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }
 android-library = { id = "com.android.library", version.ref = "androidGradlePlugin" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
-firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }

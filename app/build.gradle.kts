@@ -26,6 +26,7 @@ if (localPropertiesFile.exists()) {
 android {
     namespace = "uk.co.fireburn.gettaeit"
     compileSdk = 37
+    ndkVersion = libs.versions.ndk.get()
 
     defaultConfig {
         applicationId = "uk.co.fireburn.gettaeit"
@@ -91,7 +92,6 @@ dependencies {
 
     // Notifications and WorkManager
     implementation(libs.androidx.work.runtime.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
 
     // Core
     implementation(libs.androidx.core.ktx)
@@ -99,7 +99,6 @@ dependencies {
 
     // Permissions
     implementation(libs.accompanist.permissions)
-    implementation(libs.androidx.work.runtime.ktx)
 
     // Location — needed for FusedLocationProviderClient in SettingsViewModel
     implementation(libs.play.services.location)
