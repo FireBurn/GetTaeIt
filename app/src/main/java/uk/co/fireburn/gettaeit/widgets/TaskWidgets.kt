@@ -3,6 +3,7 @@ package uk.co.fireburn.gettaeit.widgets
 import android.content.Context
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -15,11 +16,14 @@ import androidx.glance.appwidget.updateAll
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
+import androidx.glance.layout.Row
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.height
+import androidx.glance.semantics.contentDescription
+import androidx.glance.semantics.semantics
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -47,27 +51,26 @@ internal class TaskListWidget(
 ) : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val repository = EntryPointAccessors.fromApplication(
+        val entryPoint = EntryPointAccessors.fromApplication(
             context.applicationContext,
             DataLayerEntryPoint::class.java
-        ).taskRepository()
-        
-        val prefsRepository = EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            DataLayerEntryPoint::class.java
-        ).userPreferencesRepository()
+        )
+        val now = System.currentTimeMillis()
 
-        val tasks = repository.getAllActiveToplevelTasks().first()
+        val tasks = entryPoint.taskRepository().getAllActiveToplevelTasks().first()
             .asSequence()
             .filter { it.context == contextFilter || it.context == TaskContext.ANY }
+            // Same as the plan: snoozed tasks stay out of sight until their snooze ends.
+            .filter { !it.isSnoozed || (it.snoozedUntil ?: Long.MAX_VALUE) <= now }
             .sortedWith(compareBy<TaskEntity> { it.priority }.thenBy { it.dueDate ?: Long.MAX_VALUE })
             .take(MAX_VISIBLE_TASKS)
             .toList()
-            
-        val prefs = prefsRepository.getUserPreferences().first()
+
+        val prefs = entryPoint.userPreferencesRepository().getUserPreferences().first()
 
         provideContent {
-            TaskWidgetContent(title, emptyMessage, background, tasks, prefs.xp, prefs.dailySpoons)
+            // Levels match the task list header: one every 100 XP.
+            TaskWidgetContent(title, emptyMessage, background, tasks, prefs.xp / 100 + 1, prefs.dailySpoons)
         }
     }
 
@@ -82,9 +85,10 @@ private fun TaskWidgetContent(
     emptyMessage: String,
     background: ColorProvider,
     tasks: List<TaskEntity>,
-    xp: Int,
+    level: Int,
     spoons: Int
 ) {
+    val white = ColorProvider(android.graphics.Color.WHITE)
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -93,46 +97,54 @@ private fun TaskWidgetContent(
         horizontalAlignment = Alignment.Start,
         verticalAlignment = Alignment.Top
     ) {
-        androidx.glance.layout.Row(
+        Row(
             modifier = GlanceModifier.fillMaxWidth().clickable(actionStartActivity<MainActivity>()),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = title,
                 modifier = GlanceModifier.defaultWeight(),
-                style = TextStyle(
-                    color = ColorProvider(android.graphics.Color.WHITE),
-                    fontWeight = FontWeight.Bold
-                )
+                style = TextStyle(color = white, fontWeight = FontWeight.Bold)
             )
             Text(
-                text = "Lvl ${xp / 1000 + 1} • 🥄 $spoons",
-                style = TextStyle(
-                    color = ColorProvider(android.graphics.Color.WHITE)
-                )
+                text = "Lvl $level • 🥄 $spoons",
+                modifier = GlanceModifier.semantics { contentDescription = "Level $level, $spoons spoons" },
+                style = TextStyle(color = white)
             )
         }
         Spacer(GlanceModifier.height(8.dp))
         if (tasks.isEmpty()) {
-            Text(
-                text = emptyMessage,
-                style = TextStyle(color = ColorProvider(android.graphics.Color.WHITE))
-            )
+            Text(text = emptyMessage, style = TextStyle(color = white))
         } else {
             tasks.forEach { task ->
-                Text(
-                    text = "• ${task.title}",
-                    modifier = GlanceModifier
-                        .fillMaxWidth()
-                        .clickable(
-                            actionRunCallback<CompleteTaskWidgetAction>(
-                                actionParametersOf(TaskIdKey to task.id.toString())
+                Row(
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Tapping the words opens the plan; only the tick marks it done, so a
+                    // stray tap on the home screen can't finish something by accident.
+                    Text(
+                        text = task.title,
+                        modifier = GlanceModifier
+                            .defaultWeight()
+                            .padding(vertical = 6.dp)
+                            .clickable(actionStartActivity<MainActivity>()),
+                        maxLines = 1,
+                        style = TextStyle(color = white)
+                    )
+                    Text(
+                        text = "✓",
+                        modifier = GlanceModifier
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                            .clickable(
+                                actionRunCallback<CompleteTaskWidgetAction>(
+                                    actionParametersOf(TaskIdKey to task.id.toString())
+                                )
                             )
-                        )
-                        .padding(vertical = 2.dp),
-                    maxLines = 1,
-                    style = TextStyle(color = ColorProvider(android.graphics.Color.WHITE))
-                )
+                            .semantics { contentDescription = "Mark ${task.title} done" },
+                        style = TextStyle(color = white, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    )
+                }
             }
         }
     }
@@ -149,7 +161,7 @@ class CompleteTaskWidgetAction : ActionCallback {
             context.applicationContext,
             DataLayerEntryPoint::class.java
         ).taskRepository()
-        repository.getTaskById(taskId)?.let { task -> repository.completeTask(task) }
+        repository.getTaskById(taskId)?.takeUnless { it.isCompleted }?.let { task -> repository.completeTask(task) }
         refreshTaskWidgets(context)
     }
 }
