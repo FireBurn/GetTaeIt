@@ -49,7 +49,7 @@ class BootReceiver : BroadcastReceiver() {
 
                 val prefs = userPreferencesRepository.getUserPreferences().first()
                 prefs.workLocationLatLng?.let { (lat, lng) ->
-                    geofenceManager.addWorkGeofence(lat, lng)
+                    geofenceManager.addWorkGeofence(lat, lng, prefs.workLocationRadius)
                 }
             } finally {
                 result.finish()

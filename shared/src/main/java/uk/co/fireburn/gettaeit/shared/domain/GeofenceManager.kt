@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingRequest
@@ -39,7 +40,11 @@ class GeofenceManager @Inject constructor(
         )
     }
 
-    fun addWorkGeofence(latitude: Double, longitude: Double) {
+    fun addWorkGeofence(
+        latitude: Double,
+        longitude: Double,
+        radiusMetres: Float = DEFAULT_RADIUS_METRES
+    ) {
         if (ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.ACCESS_FINE_LOCATION
@@ -51,7 +56,7 @@ class GeofenceManager @Inject constructor(
 
         val geofence = Geofence.Builder()
             .setRequestId("work_geofence")
-            .setCircularRegion(latitude, longitude, 100f) // 100-meter radius
+            .setCircularRegion(latitude, longitude, radiusMetres)
             .setExpirationDuration(Geofence.NEVER_EXPIRE)
             .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT)
             .build()
@@ -62,15 +67,18 @@ class GeofenceManager @Inject constructor(
             .build()
 
         geofencingClient.addGeofences(geofencingRequest, geofencePendingIntent)
-            .addOnSuccessListener {
-                // Geofence added successfully
-            }
             .addOnFailureListener {
-                // Failed to add geofence
+                // Typically location switched off or no "Allow all the time"; Wi-Fi and hours still work.
+                Log.w(TAG, "Couldn't register the work geofence: ${it.message}")
             }
     }
 
     fun removeWorkGeofence() {
         geofencingClient.removeGeofences(geofencePendingIntent)
+    }
+
+    companion object {
+        const val DEFAULT_RADIUS_METRES = 100f
+        private const val TAG = "GeofenceManager"
     }
 }
