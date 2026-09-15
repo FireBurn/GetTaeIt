@@ -166,6 +166,11 @@ fun TaskListScreen(
             SpoonPromptCard(onSpoonsSelected = { viewModel.setDailySpoons(it) })
         }
         ContextBanner(mode = appMode)
+        val reminderAccess = rememberReminderAccess()
+        var reminderBannerDismissed by rememberSaveable { mutableStateOf(false) }
+        if (!reminderAccess.notifications && !reminderBannerDismissed) {
+            ReminderAccessBanner(onDismiss = { reminderBannerDismissed = true })
+        }
         completionCelebration?.let { celebration ->
             CompletionCelebrationCard(
                 celebration = celebration,
