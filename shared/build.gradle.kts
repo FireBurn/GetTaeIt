@@ -42,6 +42,12 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+// A new schema version is only exported while compiling, which normally happens after the unit
+// test assets are merged. Wait for it so a migration test sees the schema on the same run.
+tasks.matching { it.name.matches(Regex("merge.*UnitTestAssets")) }.configureEach {
+    dependsOn(tasks.named("copyRoomSchemas"))
+}
+
 // Robolectric's Android 16 sandbox needs a Java 21 runtime; the code itself still targets 17.
 tasks.withType<Test>().configureEach {
     javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
