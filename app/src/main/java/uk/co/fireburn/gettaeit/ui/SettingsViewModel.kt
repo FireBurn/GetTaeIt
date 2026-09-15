@@ -26,6 +26,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import uk.co.fireburn.gettaeit.shared.data.AppDatabase
 import uk.co.fireburn.gettaeit.shared.domain.AuthRepository
+import uk.co.fireburn.gettaeit.shared.data.FirestoreTaskSync
+import uk.co.fireburn.gettaeit.shared.data.TaskSyncStore
 import com.google.gson.GsonBuilder
 import android.content.Intent
 
@@ -35,6 +37,8 @@ class SettingsViewModel @Inject constructor(
     private val geofenceManager: GeofenceManager,
     private val appDatabase: AppDatabase,
     private val authRepository: AuthRepository,
+    private val firestoreTaskSync: FirestoreTaskSync,
+    private val taskSyncStore: TaskSyncStore,
     @param:ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -163,7 +167,14 @@ class SettingsViewModel @Inject constructor(
     fun deleteAllData() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
+                val taskIds = appDatabase.taskDao().getAllTasksOnce().map { it.id }
+                // Best effort, while we still hold the sign-in. Offline, the cloud copy stays
+                // until the account's data is removed from Firebase.
+                firestoreTaskSync.deleteRemoteBackup()
                 appDatabase.clearAllTables()
+                // Tombstones hold no content, only ids and a time, and tell a paired watch to
+                // clear its copy too instead of sending everything back.
+                taskSyncStore.deleteLocally(taskIds, deletedAt = System.currentTimeMillis())
                 authRepository.signOut()
             }
         }

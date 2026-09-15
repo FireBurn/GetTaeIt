@@ -22,6 +22,10 @@ import uk.co.fireburn.gettaeit.shared.domain.UserPreferencesRepository
 import java.util.UUID
 import javax.inject.Inject
 
+/**
+ * Actions here only touch the local repository. The phone, tile and complication all
+ * follow Room (see WearTaskSync and GetTaeItWearApplication), so nothing needs nudging.
+ */
 @HiltViewModel
 class WearViewModel @Inject constructor(
     private val taskRepository: TaskRepository,
@@ -36,7 +40,10 @@ class WearViewModel @Inject constructor(
 
     fun toggleHaptics() = viewModelScope.launch { preferences.updateUserPreferences(preferences.getUserPreferences().first().copy(wearHapticsEnabled = !hapticsEnabled.value)) }
     fun startHaptic() = vibrate(longArrayOf(0, 40), intArrayOf(180, 0))
-    private fun vibrate(pattern: LongArray, amplitudes: IntArray) { if (hapticsEnabled.value) (context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator).vibrate(VibrationEffect.createWaveform(pattern, amplitudes, -1)) }
+    private fun vibrate(pattern: LongArray, amplitudes: IntArray) {
+        if (!hapticsEnabled.value) return
+        context.getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createWaveform(pattern, amplitudes, -1))
+    }
 
     val tasks: StateFlow<List<TaskEntity>> = taskRepository.getTasksForCurrentMode()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -50,13 +57,15 @@ class WearViewModel @Inject constructor(
         viewModelScope.launch {
             if (completed) taskRepository.completeTask(task) else taskRepository.uncompleteTask(task)
             if (completed) vibrate(longArrayOf(0, 35, 55, 60), intArrayOf(160, 0, 220, 0))
-            // Sync completion state to phone
-            dataLayerSync.sendTaskUpdate(task.id, completed)
             // Auto-complete parent if all subtasks done
             if (completed && task.isSubtask) {
                 task.parentId?.let { taskRepository.autoCompleteParentIfDone(it) }
             }
         }
+    }
+
+    fun deleteTask(task: TaskEntity) {
+        viewModelScope.launch { taskRepository.deleteTask(task) }
     }
 
     fun snoozeTask(task: TaskEntity) {
@@ -69,7 +78,7 @@ class WearViewModel @Inject constructor(
 
     /**
      * Sends a voice-dictated task string to the phone for AI parsing and saving.
-     * Falls back to saving locally if phone is unreachable.
+     * Falls back to saving on the watch, which syncs to the phone once it's back in range.
      */
     fun sendVoiceTaskToPhone(text: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
@@ -77,7 +86,6 @@ class WearViewModel @Inject constructor(
             try {
                 val sent = dataLayerSync.sendVoiceTask(text)
                 if (!sent) {
-                    // Phone not reachable — save locally with no date
                     taskRepository.addTask(
                         TaskEntity(title = text.replaceFirstChar { it.uppercase() })
                     )

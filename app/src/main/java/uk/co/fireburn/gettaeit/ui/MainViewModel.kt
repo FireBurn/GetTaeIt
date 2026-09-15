@@ -19,7 +19,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import uk.co.fireburn.gettaeit.notifications.ReminderScheduler
-import uk.co.fireburn.gettaeit.shared.DataLayerSync
 import uk.co.fireburn.gettaeit.shared.data.ActiveUsersSync
 import uk.co.fireburn.gettaeit.shared.data.MissedBehaviour
 import uk.co.fireburn.gettaeit.shared.data.EffortLevel
@@ -82,7 +81,6 @@ class MainViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val contextManager: ContextManager,
     private val hybridTaskService: HybridTaskService,
-    private val dataLayerSync: DataLayerSync,
     private val activeUsersSync: ActiveUsersSync,
     private val reminderScheduler: ReminderScheduler,
     @param:ApplicationContext private val appContext: Context
@@ -429,7 +427,6 @@ class MainViewModel @Inject constructor(
             taskRepository.completeTask(task)
             userPreferencesRepository.addXp(task.xpValue)
             _completionCelebration.value = CompletionCelebration(task.title, task.xpValue)
-            dataLayerSync.sendTaskUpdate(task.id, true)
             reminderScheduler.cancelTask(appContext, task)
             
             if (kotlin.random.Random.nextFloat() < 0.3f) { // 30% chance to unlock a sticker!
@@ -455,7 +452,6 @@ class MainViewModel @Inject constructor(
             taskRepository.completeTask(task)
             userPreferencesRepository.addXp(task.xpValue)
             _completionCelebration.value = CompletionCelebration(task.title, task.xpValue)
-            dataLayerSync.sendTaskUpdate(task.id, true)
             task.parentId?.let { taskRepository.autoCompleteParentIfDone(it) }
         }
     }
@@ -465,7 +461,6 @@ class MainViewModel @Inject constructor(
             taskRepository.completeTask(task.copy(actualMinutes = actualMinutes))
             userPreferencesRepository.addXp(task.xpValue)
             _completionCelebration.value = CompletionCelebration(task.title, task.xpValue)
-            dataLayerSync.sendTaskUpdate(task.id, true)
             task.parentId?.let { taskRepository.autoCompleteParentIfDone(it) }
         }
     }
@@ -473,7 +468,6 @@ class MainViewModel @Inject constructor(
     fun uncompleteTask(task: TaskEntity) {
         viewModelScope.launch {
             taskRepository.uncompleteTask(task)
-            dataLayerSync.sendTaskUpdate(task.id, false)
         }
     }
 

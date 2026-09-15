@@ -9,8 +9,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [TaskEntity::class, UserPreferences::class, ShoppingItemEntity::class],
-    version = 19,
+    entities = [TaskEntity::class, UserPreferences::class, ShoppingItemEntity::class, TaskTombstone::class],
+    version = 20,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -19,6 +19,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun userPreferencesDao(): UserPreferencesDao
     abstract fun shoppingItemDao(): ShoppingItemDao
+    abstract fun taskTombstoneDao(): TaskTombstoneDao
 
     companion object {
         private val MIGRATION_10_11 = object : Migration(10, 11) {
@@ -69,6 +70,17 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE user_preferences ADD COLUMN unlockedStickersJson TEXT NOT NULL DEFAULT '[]'")
             }
         }
+        internal val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `task_tombstones` (`id` TEXT NOT NULL, `deletedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+            }
+        }
+
+        private val ALL_MIGRATIONS = arrayOf(
+            MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15,
+            MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20
+        )
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -79,7 +91,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "get_tae_it_database"
                 )
-                    .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19)
+                    .addMigrations(*ALL_MIGRATIONS)
                     // Only pre-release installs older than v10 may be wiped. Anything newer must
                     // have a real migration (see AppDatabaseMigrationTest) rather than silently
                     // losing someone's tasks.

@@ -1,0 +1,43 @@
+rules_version = '2';
+
+// Deploy with: firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedInAs(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Task backup. Each document is either a task mirrored from Room
+    // ({json, updatedAt}) or a deletion tombstone ({deleted, deletedAt}).
+    match /users/{uid}/tasks/{taskId} {
+      allow read, delete: if signedInAs(uid);
+      allow create, update: if signedInAs(uid) && (isTask() || isTombstone());
+
+      function isTask() {
+        let data = request.resource.data;
+        return data.keys().hasOnly(['json', 'updatedAt'])
+          && data.json is string
+          && data.json.size() < 100000
+          && (!('updatedAt' in data) || data.updatedAt is int);
+      }
+
+      function isTombstone() {
+        let data = request.resource.data;
+        return data.keys().hasOnly(['deleted', 'deletedAt'])
+          && data.deleted == true
+          && data.deletedAt is int;
+      }
+    }
+
+    // Body-doubling lobby: anyone signed in can count who is focusing, but a
+    // session only ever holds its own expiry time and only its owner writes it.
+    match /active_focus_sessions/{uid} {
+      allow read: if request.auth != null;
+      allow delete: if signedInAs(uid);
+      allow create, update: if signedInAs(uid)
+        && request.resource.data.keys().hasOnly(['expiresAt'])
+        && request.resource.data.expiresAt is int;
+    }
+  }
+}

@@ -17,10 +17,13 @@ class TaskRepositoryImpl @Inject constructor(
     private val taskDao: TaskDao,
     private val contextManager: ContextManager,
     private val recurrenceEngine: RecurrenceEngine,
-    private val firestoreTaskSync: FirestoreTaskSync
+    private val firestoreTaskSync: FirestoreTaskSync,
+    private val syncStore: TaskSyncStore
 ) : TaskRepository {
 
     // ─── Active task stream ─────────────────────────────────────────────────
+
+    override fun getAllTasksFlow(): Flow<List<TaskEntity>> = taskDao.getAllTasks()
 
     override fun getTasksForCurrentMode(): Flow<List<TaskEntity>> {
         val now = System.currentTimeMillis()
@@ -107,11 +110,11 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override suspend fun deleteTask(task: TaskEntity) {
-        val subtaskIds = taskDao.getAllSubtasks(task.id).map { it.id }
-        taskDao.deleteSubtasksOf(task.id)
-        taskDao.delete(task)
-        subtaskIds.forEach { firestoreTaskSync.delete(it) }
-        firestoreTaskSync.delete(task.id)
+        val now = System.currentTimeMillis()
+        val ids = taskDao.getAllSubtasks(task.id).map { it.id } + task.id
+        // Tombstones rather than bare deletes, so the watch or cloud copy can't bring it back.
+        syncStore.deleteLocally(ids, deletedAt = now)
+        ids.forEach { firestoreTaskSync.delete(TaskTombstone(it, now)) }
     }
 
     override suspend fun archiveTask(task: TaskEntity) {

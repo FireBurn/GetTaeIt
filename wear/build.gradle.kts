@@ -11,7 +11,7 @@ android {
     ndkVersion = libs.versions.ndk.get()
 
     defaultConfig {
-        applicationId = "uk.co.fireburn.gettaeit.wear"
+        applicationId = "uk.co.fireburn.gettaeit"
         minSdk = 30
         targetSdk = 36
         versionCode = 1
@@ -61,12 +61,9 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material.icons.extended)
 
-    // Wear Tiles
+    // Wear Tiles, laid out with ProtoLayout
     implementation(libs.androidx.wear.tiles)
-    implementation(libs.androidx.wear.tiles.material)
-
-    // Wear Input (RemoteInputHelper for voice on watch)
-    implementation(libs.androidx.wear.input)
+    implementation(libs.androidx.wear.protolayout)
 
     // Wear Complications
     implementation(libs.androidx.wear.watchface.complications.data.source.ktx)

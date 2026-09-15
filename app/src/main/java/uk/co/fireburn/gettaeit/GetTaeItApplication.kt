@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import uk.co.fireburn.gettaeit.notifications.TaskNotificationManager
+import uk.co.fireburn.gettaeit.shared.WearTaskSync
 import uk.co.fireburn.gettaeit.shared.data.FirestoreTaskSync
 import uk.co.fireburn.gettaeit.shared.domain.TaskRepository
 import uk.co.fireburn.gettaeit.shared.domain.scheduling.RecurrenceResetWorker
@@ -26,6 +27,9 @@ class GetTaeItApplication : Application() {
     lateinit var firestoreTaskSync: FirestoreTaskSync
 
     @Inject
+    lateinit var wearTaskSync: WearTaskSync
+
+    @Inject
     lateinit var taskRepository: TaskRepository
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -35,6 +39,7 @@ class GetTaeItApplication : Application() {
         TaskNotificationManager.createChannel(this)
         scheduleRecurrenceWorker()
         firestoreTaskSync.start()
+        wearTaskSync.start()
         observeTaskWidgetUpdates()
     }
 
@@ -53,7 +58,8 @@ class GetTaeItApplication : Application() {
 
     private fun observeTaskWidgetUpdates() {
         applicationScope.launch {
-            taskRepository.getAllActiveToplevelTasks().collectLatest {
+            // Every change, completions included, so the widgets never show a finished task.
+            taskRepository.getAllTasksFlow().collectLatest {
                 refreshTaskWidgets(this@GetTaeItApplication)
             }
         }

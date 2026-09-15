@@ -5,6 +5,10 @@ import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 import java.util.UUID
 
 interface TaskRepository {
+
+    /** Every task, including completed and archived ones; emits on any change. */
+    fun getAllTasksFlow(): Flow<List<TaskEntity>>
+
     /** All active tasks for the current Work/Personal mode, filtered and sorted. */
     fun getTasksForCurrentMode(): Flow<List<TaskEntity>>
 

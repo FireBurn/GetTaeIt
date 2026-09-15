@@ -62,18 +62,17 @@
             android:exported="true" />
 
         <!--
-            DataLayer listener: receives task-update sync messages AND voice tasks
-            dictated on the watch. Both path prefixes are declared so the OS routes
-            them here.
+            DataLayer listener: receives the watch's task snapshots AND voice tasks
+            dictated on the watch. Both paths are declared so the OS routes them here.
         -->
         <service
             android:name="uk.co.fireburn.gettaeit.shared.DataLayerListenerService"
             android:exported="true">
             <intent-filter>
-                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
                 <data
                     android:host="*"
-                    android:pathPrefix="/task-update"
+                    android:pathPrefix="/tasks-snapshot"
                     android:scheme="wear" />
             </intent-filter>
             <intent-filter>
