@@ -97,13 +97,15 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun setWorkHours(startHour: Int, endHour: Int) {
+    fun setWorkHours(startHour: Int, startMinute: Int, endHour: Int, endMinute: Int) {
         viewModelScope.launch {
             val current = userPreferences.first()
             val updated = current.copy(
                 workSchedule = current.workSchedule.copy(
                     startHour = startHour,
-                    endHour = endHour
+                    startMinute = startMinute,
+                    endHour = endHour,
+                    endMinute = endMinute
                 )
             )
             userPreferencesRepository.updateUserPreferences(updated)

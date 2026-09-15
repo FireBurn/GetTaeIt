@@ -39,6 +39,20 @@ class AppDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun `v20 to v21 keeps work hours and starts them on the hour`() {
+        helper.createDatabase(TEST_DB, 20).use {
+            it.execSQL("INSERT INTO user_preferences (id, workLocationRadius, isVacationMode, wearHapticsEnabled, xp, dailySpoons, lastSpoonUpdateDate, routineTemplatesJson, unlockedStickersJson, startHour, endHour, workingDays) VALUES (1, 100.0, 0, 1, 0, 5, 0, '[]', '[]', 8, 16, '[2,3,4,5,6]')")
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 21, true, AppDatabase.MIGRATION_20_21).use { db ->
+            db.query("SELECT startHour, startMinute, endHour, endMinute FROM user_preferences").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(listOf(8, 0, 16, 0), (0..3).map { cursor.getInt(it) })
+            }
+        }
+    }
+
     private fun SupportSQLiteDatabase.count(table: String): Int =
         query("SELECT COUNT(*) FROM $table").use { cursor ->
             cursor.moveToFirst()

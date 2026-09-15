@@ -33,6 +33,10 @@ interface TaskDao {
     )
     fun getActiveTasks(nowMs: Long): Flow<List<TaskEntity>>
 
+    /** Not completed or archived, snoozed or not; callers decide availability against the clock. */
+    @Query("SELECT * FROM tasks WHERE isCompleted = 0 AND isArchived = 0 ORDER BY priority ASC, dueDate ASC")
+    fun getUnfinishedTasks(): Flow<List<TaskEntity>>
+
     /** Tasks whose next recurrence is due but the task has been marked complete */
     @Query(
         """

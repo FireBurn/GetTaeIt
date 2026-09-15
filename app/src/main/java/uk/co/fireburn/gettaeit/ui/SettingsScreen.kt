@@ -84,14 +84,6 @@ fun SettingsScreen(
 
     var workSsidInput by remember(prefs.workSsid) { mutableStateOf(prefs.workSsid ?: "") }
 
-    // Work hours state
-    var startHour by remember(prefs.workSchedule.startHour) {
-        mutableStateOf(prefs.workSchedule.startHour.toFloat())
-    }
-    var endHour by remember(prefs.workSchedule.endHour) {
-        mutableStateOf(prefs.workSchedule.endHour.toFloat())
-    }
-
     val dayLabels = listOf(
         Calendar.MONDAY to "Mon",
         Calendar.TUESDAY to "Tue",
@@ -167,31 +159,37 @@ fun SettingsScreen(
             val sched = prefs.workSchedule
 
             Text(
-                "Shift work? Untick every working day and let Location or Wi‑Fi decide instead.",
+                "Night shifts are fine: an end before the start finishes the next morning. No fixed days? Untick them all and let Location or Wi‑Fi decide.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            val use24Hour = android.text.format.DateFormat.is24HourFormat(context)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 OutlinedButton(
                     onClick = {
-                        android.app.TimePickerDialog(context, { _, h, _ ->
-                            viewModel.setWorkHours(h, endHour.toInt())
-                            startHour = h.toFloat()
-                        }, startHour.toInt(), 0, true).show()
+                        android.app.TimePickerDialog(context, { _, h, m ->
+                            viewModel.setWorkHours(h, m, sched.endHour, sched.endMinute)
+                        }, sched.startHour, sched.startMinute, use24Hour).show()
                     },
                     modifier = Modifier.weight(1f)
-                ) { Text("Start: ${startHour.toInt()}:00") }
+                ) { Text("Start: ${clockTime(sched.startHour, sched.startMinute)}") }
 
                 OutlinedButton(
                     onClick = {
-                        android.app.TimePickerDialog(context, { _, h, _ ->
-                            viewModel.setWorkHours(startHour.toInt(), h)
-                            endHour = h.toFloat()
-                        }, endHour.toInt(), 0, true).show()
+                        android.app.TimePickerDialog(context, { _, h, m ->
+                            viewModel.setWorkHours(sched.startHour, sched.startMinute, h, m)
+                        }, sched.endHour, sched.endMinute, use24Hour).show()
                     },
                     modifier = Modifier.weight(1f)
-                ) { Text("End: ${endHour.toInt()}:00") }
+                ) { Text("End: ${clockTime(sched.endHour, sched.endMinute)}") }
+            }
+            if (sched.endMinuteOfDay < sched.startMinuteOfDay) {
+                Text(
+                    "Finishes the next morning.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Text("Working days", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
@@ -541,6 +539,8 @@ fun SettingsScreen(
         }
     }
 }
+
+private fun clockTime(hour: Int, minute: Int): String = "%02d:%02d".format(hour, minute)
 
 @Composable
 private fun SettingsCard(

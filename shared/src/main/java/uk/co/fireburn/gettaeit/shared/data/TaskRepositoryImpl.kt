@@ -25,25 +25,29 @@ class TaskRepositoryImpl @Inject constructor(
 
     override fun getAllTasksFlow(): Flow<List<TaskEntity>> = taskDao.getAllTasks()
 
-    override fun getTasksForCurrentMode(): Flow<List<TaskEntity>> {
-        val now = System.currentTimeMillis()
-        return combine(
-            taskDao.getActiveTasks(now),
-            contextManager.appMode
-        ) { tasks, mode ->
-            tasks.filterByMode(mode).sortedByDisplayOrder()
-        }
-    }
+    override fun getTasksForCurrentMode(): Flow<List<TaskEntity>> = activeTasksForMode { true }
 
-    override fun getTopLevelTasksForCurrentMode(): Flow<List<TaskEntity>> {
-        val now = System.currentTimeMillis()
-        return combine(
-            taskDao.getActiveTasks(now),
-            contextManager.appMode
-        ) { tasks, mode ->
-            tasks.filter { it.parentId == null }.filterByMode(mode).sortedByDisplayOrder()
+    override fun getTopLevelTasksForCurrentMode(): Flow<List<TaskEntity>> =
+        activeTasksForMode { it.parentId == null }
+
+    /**
+     * Unfinished tasks for the current mode that aren't snoozed or waiting for their next
+     * recurrence. Re-checked every minute as well as on every change, so a snoozed task
+     * comes back when its snooze ends rather than the next time the app is reopened.
+     */
+    private fun activeTasksForMode(include: (TaskEntity) -> Boolean): Flow<List<TaskEntity>> =
+        combine(
+            taskDao.getUnfinishedTasks(),
+            contextManager.appMode,
+            contextManager.minuteTicks
+        ) { tasks, mode, _ ->
+            val now = System.currentTimeMillis()
+            tasks.filter { include(it) && it.isAvailableAt(now) }.filterByMode(mode).sortedByDisplayOrder()
         }
-    }
+
+    private fun TaskEntity.isAvailableAt(now: Long): Boolean =
+        (!isSnoozed || (snoozedUntil ?: Long.MAX_VALUE) <= now) &&
+            (nextOccurrenceAt ?: Long.MIN_VALUE) <= now
 
     override fun getSubtasks(parentId: UUID): Flow<List<TaskEntity>> =
         taskDao.getSubtasks(parentId)

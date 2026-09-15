@@ -7,8 +7,14 @@ import androidx.room.PrimaryKey
 data class WorkSchedule(
     val startHour: Int = 9,
     val endHour: Int = 17,
-    val workingDays: List<Int> = listOf(2, 3, 4, 5, 6) // Calendar.MONDAY..FRIDAY
-)
+    val workingDays: List<Int> = listOf(2, 3, 4, 5, 6), // Calendar.MONDAY..FRIDAY
+    val startMinute: Int = 0,
+    /** An end at or before the start is an overnight shift finishing the next morning. */
+    val endMinute: Int = 0
+) {
+    val startMinuteOfDay: Int get() = startHour * 60 + startMinute
+    val endMinuteOfDay: Int get() = endHour * 60 + endMinute
+}
 
 @Entity(tableName = "user_preferences")
 data class UserPreferences(
