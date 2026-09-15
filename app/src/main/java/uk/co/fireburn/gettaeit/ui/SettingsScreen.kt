@@ -22,6 +22,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import uk.co.fireburn.gettaeit.R
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.DeleteForever
@@ -44,6 +49,8 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -110,84 +117,29 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            "Gubbins",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        SettingsCard(
-            title = "🔒 Your data",
-            subtitle = "What Get Tae It uses and why"
-        ) {
-            Text(
-                "Tasks stay on this device by default. Location and Wi‑Fi are optional and only switch context; voice is only used when you capture by voice; on-device AI is preferred for task help. Firebase backup starts only after you sign in.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                "Full policy: PRIVACY.md in the app project. You can remove location/Wi‑Fi settings below or revoke Android permissions at any time.",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 6.dp)
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            var showDeleteConfirm by remember { mutableStateOf(false) }
-            
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = { viewModel.exportData() },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Export")
-                }
-                
-                Button(
-                    onClick = { showDeleteConfirm = true },
-                    modifier = Modifier.weight(1f),
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(Icons.Filled.DeleteForever, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Delete All")
-                }
-            }
-            
-            if (showDeleteConfirm) {
-                AlertDialog(
-                    onDismissRequest = { showDeleteConfirm = false },
-                    title = { Text("Delete all data?") },
-                    text = { Text("This will permanently delete all your tasks, settings, and sign you out. This action cannot be undone.") },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                viewModel.deleteAllData()
-                                showDeleteConfirm = false
-                            },
-                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.error
-                            )
-                        ) {
-                            Text("Delete Everything")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showDeleteConfirm = false }) {
-                            Text("Cancel")
-                        }
-                    }
+        TopAppBar(title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.coo_mark),
+                    contentDescription = null,
+                    modifier = Modifier.size(34.dp).clip(RoundedCornerShape(50))
                 )
+                Text("Gubbins")
             }
-        }
+        })
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+
 
         SettingsCard(
             title = "🏖️ Vacation Mode",
@@ -215,36 +167,37 @@ fun SettingsScreen(
             val sched = prefs.workSchedule
 
             Text(
-                "Start: ${startHour.toInt()}:00 → End: ${endHour.toInt()}:00",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
+                "Shift work? Untick every working day and let Location or Wi‑Fi decide instead.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Text("Start hour", style = MaterialTheme.typography.labelSmall)
-            Slider(
-                value = startHour,
-                onValueChange = { startHour = it },
-                onValueChangeFinished = {
-                    viewModel.setWorkHours(startHour.toInt(), endHour.toInt())
-                },
-                valueRange = 0f..23f,
-                steps = 22
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        android.app.TimePickerDialog(context, { _, h, _ ->
+                            viewModel.setWorkHours(h, endHour.toInt())
+                            startHour = h.toFloat()
+                        }, startHour.toInt(), 0, true).show()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Start: ${startHour.toInt()}:00") }
 
-            Text("End hour", style = MaterialTheme.typography.labelSmall)
-            Slider(
-                value = endHour,
-                onValueChange = { if (it > startHour) endHour = it },
-                onValueChangeFinished = {
-                    viewModel.setWorkHours(startHour.toInt(), endHour.toInt())
-                },
-                valueRange = 0f..23f,
-                steps = 22
-            )
+                OutlinedButton(
+                    onClick = {
+                        android.app.TimePickerDialog(context, { _, h, _ ->
+                            viewModel.setWorkHours(startHour.toInt(), h)
+                            endHour = h.toFloat()
+                        }, endHour.toInt(), 0, true).show()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("End: ${endHour.toInt()}:00") }
+            }
 
-            Text("Working days", style = MaterialTheme.typography.labelSmall)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            Text("Working days", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
+            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 dayLabels.forEach { (calDay, label) ->
@@ -252,14 +205,10 @@ fun SettingsScreen(
                     FilterChip(
                         selected = selected,
                         onClick = {
-                            val newDays = if (selected)
-                                sched.workingDays - calDay
-                            else
-                                sched.workingDays + calDay
+                            val newDays = if (selected) sched.workingDays - calDay else sched.workingDays + calDay
                             viewModel.setWorkingDays(newDays.sorted())
                         },
-                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                        modifier = Modifier.weight(1f)
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) }
                     )
                 }
             }
@@ -505,29 +454,6 @@ fun SettingsScreen(
             }
         }
 
-        // ── Wear OS ────────────────────────────────────────────────────────
-        SettingsCard(title = "⌚ Wear OS", subtitle = null) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Watch, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Haptic Feedback", style = MaterialTheme.typography.bodyMedium)
-                }
-                Switch(
-                    checked = prefs.wearHapticsEnabled,
-                    onCheckedChange = { viewModel.setWearHapticsEnabled(it) }
-                )
-            }
-            Text(
-                "Distinct vibration patterns on your watch for start, reminder, and completion.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
 
         // ── About ────────────────────────────────────────────────────────────
         SettingsCard(title = "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Get Tae It", subtitle = null) {
@@ -541,6 +467,77 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+
+        Spacer(Modifier.height(8.dp))
+        SettingsCard(
+            title = "🔒 Your data",
+            subtitle = "What Get Tae It uses and why"
+        ) {
+            Text(
+                "Tasks stay on this device by default. Location and Wi‑Fi are optional and only switch context; voice is only used when you capture by voice; on-device AI is preferred for task help. Firebase backup starts only after you sign in.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "Full policy: PRIVACY.md in the app project. You can remove location/Wi‑Fi settings below or revoke Android permissions at any time.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            var showDeleteConfirm by remember { mutableStateOf(false) }
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { viewModel.exportData() },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Export")
+                }
+                
+                Button(
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier.weight(1f),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(Icons.Filled.DeleteForever, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Delete All")
+                }
+            }
+            
+            if (showDeleteConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteConfirm = false },
+                    title = { Text("Delete all data?") },
+                    text = { Text("This will permanently delete all your tasks, settings, and sign you out. This action cannot be undone.") },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                viewModel.deleteAllData()
+                                showDeleteConfirm = false
+                            },
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Delete Everything")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteConfirm = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+        }
         }
     }
 }
