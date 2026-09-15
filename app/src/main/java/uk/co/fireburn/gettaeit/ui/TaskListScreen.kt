@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -47,6 +49,7 @@ import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -78,8 +81,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -427,6 +435,7 @@ private fun ContextBanner(mode: AppMode) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .semantics(mergeDescendants = true) {}
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -453,7 +462,7 @@ private fun ContextBanner(mode: AppMode) {
                 )
                 Text(
                     sub, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -588,7 +597,8 @@ private fun SubtaskCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(enabled = !done) {
+                .semantics { stateDescription = if (done) "Done" else "Not done" }
+                .clickable(enabled = !done, onClickLabel = "mark done", role = Role.Checkbox) {
                     if (subtask.estimatedMinutes != null) showTimeDlg = true
                     else onComplete()
                 }
@@ -598,7 +608,7 @@ private fun SubtaskCard(
         ) {
             Icon(
                 if (done) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-                contentDescription = if (done) "Done" else "Complete",
+                contentDescription = null,
                 tint = if (done) accent else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(22.dp)
             )
@@ -639,7 +649,7 @@ private fun SubtaskCard(
 
 // ─── Parent footer card ──────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun ParentFooterCard(
     task: TaskEntity,
@@ -722,6 +732,16 @@ private fun ParentFooterCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
+                    // TalkBack reads the card as one item and offers the menu's gentler actions
+                    // directly. Delete stays behind the menu so it can't be triggered by accident.
+                    .semantics(mergeDescendants = true) {
+                        customActions = listOf(
+                            CustomAccessibilityAction("Snooze 2 hours") { onSnooze(); true },
+                            CustomAccessibilityAction("Snooze till tomorrow") { onSnoozeTomorrow(); true },
+                            CustomAccessibilityAction("Edit task") { onEdit(); true },
+                            CustomAccessibilityAction("Gentle reset") { showGentleReentry = true; true }
+                        )
+                    }
                     .padding(start = 14.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
@@ -776,10 +796,13 @@ private fun ParentFooterCard(
                     }
                 }
 
-                Row(
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    // Words and an icon as well as the accent stripe, so context never relies on colour.
+                    ContextChip(task.context, accent)
                     if (task.recurrence.type != RecurrenceType.NONE) {
                         MetaChip(
                             Icons.Filled.Repeat,
@@ -948,6 +971,16 @@ fun CompletionTimeDialog(
 }
 
 // ─── Meta chip ────────────────────────────────────────────────────────────────
+
+@Composable
+internal fun ContextChip(context: TaskContext, tint: Color) {
+    val (icon, label) = when (context) {
+        TaskContext.WORK -> Icons.Filled.Work to "Work"
+        TaskContext.PERSONAL -> Icons.Filled.Home to "Personal"
+        TaskContext.ANY -> Icons.Filled.AllInclusive to "Any time"
+    }
+    MetaChip(icon, label, tint)
+}
 
 @Composable
 private fun MetaChip(

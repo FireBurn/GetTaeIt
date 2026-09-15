@@ -191,9 +191,11 @@ fun VoiceInputScreen(
         else permissionState.launchPermissionRequest()
     }
 
+    // The pulse is decoration ("Listening..." says it all), so it stays still for Remove animations.
+    val reduceMotion = remember { context.prefersReducedMotion() }
     val infiniteTransition = rememberInfiniteTransition(label = "mic_pulse")
     val scale by infiniteTransition.animateFloat(
-        initialValue = 1f, targetValue = 1.15f,
+        initialValue = 1f, targetValue = if (reduceMotion) 1f else 1.15f,
         animationSpec = infiniteRepeatable(tween(700)), label = "scale"
     )
 

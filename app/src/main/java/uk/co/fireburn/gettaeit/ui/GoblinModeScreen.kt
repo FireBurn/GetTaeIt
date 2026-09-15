@@ -124,15 +124,15 @@ fun GoblinModeScreen(
                 OutlinedButton(
                     onClick = { onMakeSmaller(task); showWallOfAwful = false },
                     modifier = Modifier.fillMaxWidth()
-                ) { Text("Too many steps -> Break it down (AI)") }
+                ) { Text("Too many steps → Break it down (AI)") }
                 OutlinedButton(
                     onClick = { onSnooze(task); showWallOfAwful = false },
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                ) { Text("I'm exhausted -> Snooze it") }
+                ) { Text("I'm exhausted → Snooze it") }
                 OutlinedButton(
                     onClick = { onStartFocus(5); showWallOfAwful = false },
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                ) { Text("I'm anxious -> 5 Min Focus Dash") }
+                ) { Text("I'm anxious → 5 min focus dash") }
                 TextButton(
                     onClick = { showWallOfAwful = false },
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
@@ -304,47 +304,20 @@ fun BodyDoublingLobbyDialog(
         text = {
             Column {
                 Text(
-                    "Knowing others are working right now can help your brain engage. You are not alone!",
+                    "Knowing others are working right now can help your brain engage. You're no' on your own.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 androidx.compose.foundation.layout.Spacer(Modifier.height(16.dp))
-                
-                // Generate some fake users for the lobby feel
-                val fakeNames = androidx.compose.runtime.remember { listOf("Alex", "Sam", "Jordan", "Casey", "Taylor", "Morgan", "Riley", "Drew").shuffled().take(minOf(activeUsersCount, 4).coerceAtLeast(1)) }
-                
-                fakeNames.forEach { name ->
-                    androidx.compose.foundation.layout.Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        androidx.compose.foundation.layout.Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(MaterialTheme.colorScheme.secondaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(name.take(1), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                        }
-                        androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
-                        Text(name, fontWeight = FontWeight.Medium)
-                        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-                        Text("Focusing", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-                
-                if (activeUsersCount > fakeNames.size) {
-                    Text(
-                        "...and ${activeUsersCount - fakeNames.size} others",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp, start = 44.dp)
-                    )
-                }
-                
+
+                // Only ever a real count: the lobby doesn't invent people or say who they are.
+                Text(
+                    if (activeUsersCount == 1) "1 other person is focusing right now."
+                    else "$activeUsersCount other people are focusing right now.",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium
+                )
+
                 androidx.compose.foundation.layout.Spacer(Modifier.height(24.dp))
                 Text("Join them:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 androidx.compose.foundation.layout.Row(
