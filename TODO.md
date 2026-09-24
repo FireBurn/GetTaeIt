@@ -8,7 +8,7 @@ codebase. Validate each item on a physical device before marking it complete.
 - [ ] Add Firebase project configuration locally (`app/google-services.json`),
   configure Auth/Firestore rules, and verify Google sign-in plus backup/restore
   on two devices.
-- [ ] Define and test sync conflict rules: offline edits, deletion versus edit,
+- [x] Define and test sync conflict rules: offline edits, deletion versus edit,
   concurrent completion, and repeated Firestore listener events.
 - [x] Implement the two promised home-screen widgets (Work and Personal) with
   an empty state and a direct link into the planner.
@@ -24,8 +24,9 @@ codebase. Validate each item on a physical device before marking it complete.
   and exact-alarm behaviour where applicable.
 - [ ] Test phone ↔ Wear completion/snooze/voice sync and the Auto experience on
   actual supported hardware or emulators.
-- [x] Add in-app privacy explanation and data deletion/export controls; publish
-  [PRIVACY.md](PRIVACY.md) with Play Store Data Safety declarations.
+- [ ] Publish [PRIVACY.md](PRIVACY.md), complete Play Store Data Safety
+  declarations, and verify cloud-backup deletion. In-app explanation and local
+  export/deletion controls are implemented.
 
 ## High-value product work
 
@@ -53,14 +54,14 @@ codebase. Validate each item on a physical device before marking it complete.
 
 - [x] Add a Wear complication for the one next actionable task. Tiles are not
   declared until their implementations and previews are ready.
-- [x] Add distinct, accessible Wear haptic patterns for start, reminder, and
-  timer completion, with a user setting to disable them.
+- [ ] Add distinct, accessible Wear haptic patterns for reminder and timer
+  completion. Start, completion and snooze patterns plus a user setting exist.
 - [x] Complete Auto’s driver-safe morning briefing and voice capture feedback;
   defer maps/errand interception until it can be validated against Car App
   library and Play review constraints.
-- [ ] Make the commute mode use a real vehicle/connection signal where
+- [x] Make the commute mode use a real vehicle/connection signal where
   available, rather than only a time-window heuristic.
-- [ ] Add accessibility coverage: TalkBack labels/order, font scaling, contrast,
+- [x] Add accessibility coverage: TalkBack labels/order, font scaling, contrast,
   reduced motion, and non-colour-only Work/Personal cues.
 
 ## Additional ADHD-first ideas
