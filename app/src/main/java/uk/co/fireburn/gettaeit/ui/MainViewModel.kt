@@ -430,8 +430,9 @@ class MainViewModel @Inject constructor(
             taskRepository.completeTask(task)
             userPreferencesRepository.addXp(task.xpValue)
             _completionCelebration.value = CompletionCelebration(task.title, task.xpValue)
-            reminderScheduler.cancelTask(appContext, task)
-            
+            // Line up the next occurrence's reminders (or none, for a one-off).
+            taskRepository.getTaskById(task.id)?.let { reminderScheduler.scheduleTask(appContext, it) }
+
             if (kotlin.random.Random.nextFloat() < 0.3f) { // 30% chance to unlock a sticker!
                 val sticker = listOf("sticker_wizard", "sticker_knight", "sticker_spoon").random()
                 userPreferencesRepository.unlockSticker(sticker)

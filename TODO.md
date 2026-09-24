@@ -1,13 +1,15 @@
 # Get Tae It — delivery backlog
 
 This is a prioritised backlog derived from the project brief and the current
-codebase. Validate each item on a physical device before marking it complete.
+codebase. Code items are checked off when implemented and automated checks pass;
+device and release-console validation remain open until actually completed.
 
 ## Release blockers
 
-- [ ] Add Firebase project configuration locally (`app/google-services.json`),
-  configure Auth/Firestore rules, and verify Google sign-in plus backup/restore
-  on two devices.
+- [x] Add local Firebase project configuration (`app/google-services.json`)
+  and author Firestore rules (`firestore.rules`).
+- [ ] Deploy the Firestore rules, enable Google sign-in for the Firebase project,
+  and verify sign-in plus backup/restore on two devices.
 - [x] Define and test sync conflict rules: offline edits, deletion versus edit,
   concurrent completion, and repeated Firestore listener events.
 - [x] Implement the two promised home-screen widgets (Work and Personal) with
@@ -18,6 +20,8 @@ codebase. Validate each item on a physical device before marking it complete.
 - [x] Add unit tests for context-mode selection, including vacation boundaries.
 - [x] Add unit tests for Firestore mapping/conflict handling.
 - [x] Add unit tests for recurrence and meal-offset generation.
+- [x] Keep recurring reminder alarms current, suppress stale/snoozed reminders,
+  and reschedule after notification actions.
 - [x] Add unit tests for dependency-cycle detection and dependency ranking.
 - [ ] Run an end-to-end permission and notification audit on Android 13–16:
   notification, precise/background location, geofence recovery after reboot,

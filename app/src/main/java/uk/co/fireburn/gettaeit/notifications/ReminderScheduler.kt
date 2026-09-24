@@ -5,61 +5,43 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import uk.co.fireburn.gettaeit.shared.data.RecurrenceConfig
-import uk.co.fireburn.gettaeit.shared.data.RecurrenceType
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
-import java.util.Calendar
+import uk.co.fireburn.gettaeit.shared.domain.scheduling.ReminderPlanner
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Schedules and cancels AlarmManager alarms for task reminders.
  *
- * For tasks with timesPerDay > 1, multiple alarms are scheduled — one per slot.
- * Slots are spread evenly across waking hours (07:00 – 22:00).
+ * Each configured reminder slot gets its next alarm. When an alarm fires, the receiver
+ * validates the current task and schedules the next occurrence for each slot.
  *
  * Uses setExactAndAllowWhileIdle so alarms fire even in Doze mode.
  * On Android 12+ this requires SCHEDULE_EXACT_ALARM or USE_EXACT_ALARM permission.
  *
  * Each alarm triggers [ReminderReceiver] which then posts the notification.
- * After each alarm fires, it is NOT automatically rescheduled — the ViewModel
- * calls [scheduleTask] again when the task resets for the next recurrence.
+ * The scheduler delegates date, recurrence and snooze rules to [ReminderPlanner].
  */
 @Singleton
 class ReminderScheduler @Inject constructor() {
-
-    /** Waking day window: 07:00 to 22:00 = 900 minutes span */
-    private val WAKE_START_MINS = 7 * 60   // 07:00
-    private val WAKE_END_MINS = 22 * 60  // 22:00
-    private val WAKE_SPAN_MINS = WAKE_END_MINS - WAKE_START_MINS
 
     /**
      * Schedule all reminder slots for [task].
      * Safe to call on update — cancels existing alarms first.
      */
     fun scheduleTask(context: Context, task: TaskEntity) {
-        if (task.recurrence.type == RecurrenceType.NONE) return
-        if (task.isCompleted) {
-            cancelTask(context, task); return
-        }
-
-        cancelTask(context, task) // clear old alarms
-        val slotTimes = computeSlotTimesMs(task.recurrence)
-        slotTimes.forEachIndexed { slotIndex, triggerAtMs ->
-            if (triggerAtMs > System.currentTimeMillis()) {
-                scheduleAlarm(context, task, slotIndex, triggerAtMs)
-            }
+        cancelTask(context, task)
+        ReminderPlanner.nextTriggerTimes(task, System.currentTimeMillis()).forEachIndexed { slotIndex, triggerAtMs ->
+            scheduleAlarm(context, task, slotIndex, triggerAtMs)
         }
     }
 
     /** Cancel all alarms for [task]. */
     fun cancelTask(context: Context, task: TaskEntity) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val slotCount = if (task.recurrence.dailySlotMinutes.isNotEmpty())
-            task.recurrence.dailySlotMinutes.size
-        else
-            task.recurrence.timesPerDay.coerceAtLeast(1)
-        repeat(slotCount) { slotIndex ->
+        // Clear every supported slot so reducing the configured slot count cannot leave
+        // an old alarm armed under an index that no longer exists.
+        repeat(ReminderPlanner.MAX_SLOTS) { slotIndex ->
             am.cancel(buildPendingIntent(context, task.id.toString(), slotIndex))
         }
     }
@@ -85,50 +67,6 @@ class ReminderScheduler @Inject constructor() {
         } catch (e: SecurityException) {
             // Exact alarms not permitted — use inexact fallback
             am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pi)
-        }
-    }
-
-    /**
-     * Computes the epoch-ms trigger time for each daily slot.
-     *
-     * Priority order:
-     *   1. [RecurrenceConfig.dailySlotMinutes] — explicit named times (e.g. wake/lunch/dinner/bed).
-     *   2. Even-spread across waking hours based on [RecurrenceConfig.timesPerDay],
-     *      anchored at [RecurrenceConfig.preferredTimeOfDayMinutes] if set.
-     *
-     * Slots already past today are pushed to tomorrow.
-     */
-    private fun computeSlotTimesMs(config: RecurrenceConfig): List<Long> {
-        val now = Calendar.getInstance()
-
-        val slotMinutes: List<Int> = when {
-            // 1. Explicit slot times — use as-is
-            config.dailySlotMinutes.isNotEmpty() -> config.dailySlotMinutes.sorted()
-
-            // 2. Even-spread fallback
-            else -> {
-                val n = config.timesPerDay.coerceAtLeast(1)
-                if (n == 1) {
-                    listOf(config.preferredTimeOfDayMinutes ?: WAKE_START_MINS)
-                } else {
-                    val firstMins = config.preferredTimeOfDayMinutes ?: WAKE_START_MINS
-                    val step = WAKE_SPAN_MINS / (n - 1).coerceAtLeast(1)
-                    (0 until n).map { i ->
-                        (firstMins + i * step).coerceAtMost(WAKE_END_MINS)
-                    }
-                }
-            }
-        }
-
-        return slotMinutes.map { mins ->
-            Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, mins / 60)
-                set(Calendar.MINUTE, mins % 60)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-                // If this slot has already passed today, push to tomorrow
-                if (before(now)) add(Calendar.DAY_OF_YEAR, 1)
-            }.timeInMillis
         }
     }
 

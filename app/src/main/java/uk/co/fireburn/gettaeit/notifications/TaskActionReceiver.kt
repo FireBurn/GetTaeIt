@@ -26,6 +26,9 @@ class TaskActionReceiver : BroadcastReceiver() {
     @Inject
     lateinit var taskRepository: TaskRepository
 
+    @Inject
+    lateinit var reminderScheduler: ReminderScheduler
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -44,6 +47,7 @@ class TaskActionReceiver : BroadcastReceiver() {
                         val uuid = UUID.fromString(taskId)
                         val task = taskRepository.getTaskById(uuid) ?: return@launch
                         taskRepository.completeTask(task)
+                        taskRepository.getTaskById(uuid)?.let { reminderScheduler.scheduleTask(context, it) }
                         // If it's a subtask, auto-complete parent if all siblings done
                         task.parentId?.let { taskRepository.autoCompleteParentIfDone(it) }
                     } finally {
