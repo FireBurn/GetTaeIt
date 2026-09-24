@@ -78,11 +78,36 @@ class DataLayerSync @Inject constructor(
         }
     }
 
+    /**
+     * Ask each reachable paired watch to play a short, local haptic.  This is a
+     * message rather than a data item: a missed reminder must not buzz later
+     * when the person reconnects their watch.
+     */
+    suspend fun sendWearHaptic(event: String): Boolean {
+        return try {
+            val nodes = capabilityClient
+                .getCapability(WEAR_CAPABILITY, CapabilityClient.FILTER_REACHABLE)
+                .awaitTask()
+                .nodes
+            if (nodes.isEmpty()) return false
+            nodes.forEach { node ->
+                messageClient.sendMessage(node.id, HAPTIC_PATH, event.toByteArray(Charsets.UTF_8))
+                    .awaitTask()
+            }
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     companion object {
         const val WEAR_CAPABILITY = "get_tae_it_wear_app"
         const val PHONE_CAPABILITY = "get_tae_it_phone_app"
         const val SNAPSHOT_PATH = "/tasks-snapshot"
         const val VOICE_TASK_PATH = "/voice-task"
+        const val HAPTIC_PATH = "/wear-haptic"
+        const val HAPTIC_REMINDER = "reminder"
+        const val HAPTIC_TIMER_COMPLETE = "timer_complete"
         private const val KEY_SNAPSHOT = "snapshot"
         private const val KEY_GENERATED_AT = "generatedAt"
     }

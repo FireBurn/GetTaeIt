@@ -54,8 +54,9 @@ codebase. Validate each item on a physical device before marking it complete.
 
 - [x] Add a Wear complication for the one next actionable task. Tiles are not
   declared until their implementations and previews are ready.
-- [ ] Add distinct, accessible Wear haptic patterns for reminder and timer
-  completion. Start, completion and snooze patterns plus a user setting exist.
+- [ ] Validate distinct, accessible Wear haptic patterns for reminder and timer
+  completion on a paired watch. Start, completion, snooze, reminder and timer
+  patterns plus a user setting are implemented.
 - [x] Complete Auto’s driver-safe morning briefing and voice capture feedback;
   defer maps/errand interception until it can be validated against Car App
   library and Play review constraints.

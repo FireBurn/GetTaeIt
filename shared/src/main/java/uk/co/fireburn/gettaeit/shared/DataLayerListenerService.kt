@@ -1,5 +1,7 @@
 package uk.co.fireburn.gettaeit.shared
 
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.util.Log
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -11,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import uk.co.fireburn.gettaeit.shared.data.TaskEntity
 import uk.co.fireburn.gettaeit.shared.di.DataLayerEntryPoint
 import java.util.UUID
@@ -50,6 +53,10 @@ class DataLayerListenerService : WearableListenerService() {
 
     // ── Voice task from watch → parse on phone and save ──────────────────────
     override fun onMessageReceived(messageEvent: MessageEvent) {
+        if (messageEvent.path == DataLayerSync.HAPTIC_PATH) {
+            serviceScope.launch { playWearHaptic(messageEvent.data.toString(Charsets.UTF_8)) }
+            return
+        }
         if (messageEvent.path != DataLayerSync.VOICE_TASK_PATH) return
         val text = messageEvent.data.toString(Charsets.UTF_8)
         if (text.isBlank()) return
@@ -86,6 +93,20 @@ class DataLayerListenerService : WearableListenerService() {
                 }
             }
         }
+    }
+
+    /** Runs only on the Wear target: the phone sends this message exclusively to Wear nodes. */
+    private suspend fun playWearHaptic(event: String) {
+        if (!entryPoint.userPreferencesRepository().getUserPreferences().first().wearHapticsEnabled) return
+        val (pattern, amplitudes) = when (event) {
+            DataLayerSync.HAPTIC_REMINDER ->
+                longArrayOf(0, 65, 110, 65) to intArrayOf(170, 0, 210, 0)
+            DataLayerSync.HAPTIC_TIMER_COMPLETE ->
+                longArrayOf(0, 45, 70, 45, 70, 90) to intArrayOf(150, 0, 180, 0, 230, 0)
+            else -> return
+        }
+        applicationContext.getSystemService(Vibrator::class.java)
+            ?.vibrate(VibrationEffect.createWaveform(pattern, amplitudes, -1))
     }
 
     private companion object {
