@@ -56,8 +56,10 @@ device and release-console validation remain open until actually completed.
 
 ## Ecosystem polish
 
-- [x] Add a Wear complication for the one next actionable task. Tiles are not
-  declared until their implementations and previews are ready.
+- [x] Add a Wear complication for the one next actionable task, with preview
+  data.
+- [x] Add a Wear Tile showing the next task or an empty state, with Done,
+  Snooze, and open-app actions.
 - [ ] Validate distinct, accessible Wear haptic patterns for reminder and timer
   completion on a paired watch. Start, completion, snooze, reminder and timer
   patterns plus a user setting are implemented.
