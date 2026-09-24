@@ -32,36 +32,37 @@ class AutoViewModel @Inject constructor(
         }
     }
 
-    fun addTasksFromVoice(prompt: String) {
+    fun addTasksFromVoice(prompt: String, onSaved: () -> Unit = {}) {
         if (prompt.isBlank()) return
         viewModelScope.launch {
             val parsedList = hybridTaskService.parsePrompt(prompt)
             parsedList.forEach { parsed ->
-                val parentId = UUID.randomUUID()
+                    val parentId = UUID.randomUUID()
 
-                taskRepository.addTask(
-                    TaskEntity(
-                        id = parentId,
-                        title = parsed.title,
-                        context = parsed.suggestedContext,
-                        priority = 3, // Default normal priority
-                        estimatedMinutes = parsed.estimatedMinutes
-                    )
-                )
-
-                if (parsed.subtasks.isNotEmpty()) {
-                    taskRepository.addAll(parsed.subtasks.map { sub ->
+                    taskRepository.addTask(
                         TaskEntity(
-                            title = sub.title,
+                            id = parentId,
+                            title = parsed.title,
                             context = parsed.suggestedContext,
-                            priority = (3 + sub.priorityOffset).coerceIn(1, 5),
-                            parentId = parentId,
-                            isSubtask = true,
-                            estimatedMinutes = sub.estimatedMinutes
+                            priority = 3,
+                            estimatedMinutes = parsed.estimatedMinutes
                         )
-                    })
-                }
+                    )
+
+                    if (parsed.subtasks.isNotEmpty()) {
+                        taskRepository.addAll(parsed.subtasks.map { sub ->
+                            TaskEntity(
+                                title = sub.title,
+                                context = parsed.suggestedContext,
+                                priority = (3 + sub.priorityOffset).coerceIn(1, 5),
+                                parentId = parentId,
+                                isSubtask = true,
+                                estimatedMinutes = sub.estimatedMinutes
+                            )
+                        })
+                    }
             }
+            onSaved()
         }
     }
 }

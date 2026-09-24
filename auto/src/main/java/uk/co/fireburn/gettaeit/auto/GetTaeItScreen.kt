@@ -39,7 +39,8 @@ class GetTaeItScreen(
     }
 
     override fun onGetTemplate(): Template {
-        val activeTasks = tasks.filter { !it.isCompleted }.take(6)
+        // Auto must be glanceable. Three choices are enough while driving.
+        val activeTasks = tasks.filter { !it.isCompleted }.take(3)
 
         val taskList = ItemList.Builder().apply {
             if (activeTasks.isEmpty()) {
@@ -49,6 +50,12 @@ class GetTaeItScreen(
                         .build()
                 )
             } else {
+                addItem(
+                    Row.Builder()
+                        .setTitle("${tasks.count { !it.isCompleted }} things on your list")
+                        .addText("Here are the next three. Keep your eyes on the road.")
+                        .build()
+                )
                 activeTasks.forEach { task ->
                     val subtitleParts = mutableListOf<String>()
                     task.estimatedMinutes?.let { subtitleParts.add("~${it}min") }
