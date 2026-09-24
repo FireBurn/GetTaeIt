@@ -18,6 +18,7 @@ device and release-console validation remain open until actually completed.
   concurrent completion, and repeated Firestore listener events.
 - [x] Implement the two promised home-screen widgets (Work and Personal) with
   an empty state and a direct link into the planner.
+- [x] Offer launcher-supported shortcuts to pin either widget from Settings.
 - [x] Refresh installed widgets when the local task stream changes.
 - [x] Add a direct widget completion action.
 - [ ] Test widget completion and refresh behaviour on a physical device.

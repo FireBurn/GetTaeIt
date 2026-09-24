@@ -70,6 +70,9 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.launch
 import uk.co.fireburn.gettaeit.auth.GoogleSignInHelper
+import uk.co.fireburn.gettaeit.shared.data.TaskContext
+import uk.co.fireburn.gettaeit.widgets.canPinTaskWidgets
+import uk.co.fireburn.gettaeit.widgets.requestPinTaskWidget
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
@@ -452,6 +455,32 @@ fun SettingsScreen(
             }
         }
 
+
+        if (canPinTaskWidgets(context)) {
+            SettingsCard(
+                title = "📱 Home-screen widgets",
+                subtitle = "Put your Work or Personal list where you can see it"
+            ) {
+                Text(
+                    "Your launcher will ask you to confirm before adding a widget.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { requestPinTaskWidget(context, TaskContext.WORK) },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Add Work") }
+                    OutlinedButton(
+                        onClick = { requestPinTaskWidget(context, TaskContext.PERSONAL) },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Add Personal") }
+                }
+            }
+        }
 
         // ── About ────────────────────────────────────────────────────────────
         SettingsCard(title = "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Get Tae It", subtitle = null) {
