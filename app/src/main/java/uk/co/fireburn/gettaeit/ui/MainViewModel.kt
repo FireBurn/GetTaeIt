@@ -472,6 +472,7 @@ class MainViewModel @Inject constructor(
     fun uncompleteTask(task: TaskEntity) {
         viewModelScope.launch {
             taskRepository.uncompleteTask(task)
+            taskRepository.getTaskById(task.id)?.let { reminderScheduler.scheduleTask(appContext, it) }
         }
     }
 
@@ -611,9 +612,8 @@ class MainViewModel @Inject constructor(
             )
             taskRepository.updateTask(updated)
 
-            if (updated.recurrence.type != RecurrenceType.NONE) {
-                reminderScheduler.scheduleTask(appContext, updated)
-            }
+            // Also clear any old alarms when a recurring task becomes a one-off.
+            reminderScheduler.scheduleTask(appContext, updated)
             _editingTaskId.value = null
             resetAddTaskState()
         }
