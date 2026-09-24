@@ -35,9 +35,14 @@ class ReminderReceiver : BroadcastReceiver() {
                     ReminderEntryPoint::class.java
                 )
                 val repository = entryPoint.taskRepository()
-                repository.resetDueRecurrences()
-                val task = runCatching { repository.getTaskById(UUID.fromString(taskId)) }.getOrNull()
-                if (task != null && ReminderPlanner.shouldNotify(task, System.currentTimeMillis())) {
+                val uuid = runCatching { UUID.fromString(taskId) }.getOrNull() ?: return@launch
+                val now = System.currentTimeMillis()
+                var task = repository.getTaskById(uuid)
+                if (task?.isCompleted == true && task.nextOccurrenceAt?.let { it <= now } == true) {
+                    repository.uncompleteTask(task)
+                    task = repository.getTaskById(uuid)
+                }
+                if (task != null && ReminderPlanner.shouldNotify(task, now)) {
                     TaskNotificationManager.showReminder(context, taskId, task.title, slotIndex)
                     entryPoint.dataLayerSync().sendWearHaptic(DataLayerSync.HAPTIC_REMINDER)
                 }
