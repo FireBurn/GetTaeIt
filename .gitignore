@@ -50,6 +50,7 @@ captures/
 # Keystore files (NEVER commit these)
 *.jks
 *.keystore
+keystore.properties
 
 # External native build folder
 .cxx/

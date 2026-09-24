@@ -8,6 +8,10 @@ device and release-console validation remain open until actually completed.
 
 - [x] Add local Firebase project configuration (`app/google-services.json`)
   and author Firestore rules (`firestore.rules`).
+- [x] Configure phone, Wear, and Auto release builds with opt-in local
+  signing and R8/resource shrinking; share the signing key across paired apps.
+- [ ] Create and protect the production signing key, then verify the release
+  bundle and matching phone/Wear signatures before publishing.
 - [ ] Deploy the Firestore rules, enable Google sign-in for the Firebase project,
   and verify sign-in plus backup/restore on two devices.
 - [x] Define and test sync conflict rules: offline edits, deletion versus edit,
