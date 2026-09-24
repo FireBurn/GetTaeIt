@@ -726,16 +726,6 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun rescheduleAllReminders() {
-        viewModelScope.launch {
-            taskRepository.getAllActiveToplevelTasks().collect { tasks ->
-                tasks.filter { it.recurrence.type != RecurrenceType.NONE }
-                    .forEach { reminderScheduler.scheduleTask(appContext, it) }
-                return@collect // only process first emission
-            }
-        }
-    }
-
     fun setDailySpoons(spoons: Int) {
         viewModelScope.launch {
             userPreferencesRepository.updateSpoons(spoons)
