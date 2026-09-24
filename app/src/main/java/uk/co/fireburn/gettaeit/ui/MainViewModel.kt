@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import uk.co.fireburn.gettaeit.notifications.ReminderScheduler
 import uk.co.fireburn.gettaeit.shared.data.ActiveUsersSync
+import uk.co.fireburn.gettaeit.shared.DataLayerSync
 import uk.co.fireburn.gettaeit.shared.data.MissedBehaviour
 import uk.co.fireburn.gettaeit.shared.data.EffortLevel
 import uk.co.fireburn.gettaeit.shared.data.RecurrenceConfig
@@ -83,6 +84,7 @@ class MainViewModel @Inject constructor(
     private val hybridTaskService: HybridTaskService,
     private val activeUsersSync: ActiveUsersSync,
     private val reminderScheduler: ReminderScheduler,
+    private val dataLayerSync: DataLayerSync,
     @param:ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -176,6 +178,7 @@ class MainViewModel @Inject constructor(
                         totalSeconds = totalSeconds
                     )
                     activeUsersSync.clearFocusSession()
+                    dataLayerSync.sendWearHaptic(DataLayerSync.HAPTIC_TIMER_COMPLETE)
                     break
                 }
                 _focusSession.value = _focusSession.value.copy(
